@@ -506,10 +506,11 @@ let parse_embedding_exn ~loc ~payload ~name ~embedding_syntax =
   | None -> None
 
 let find_and_remove_jane_syntax_attribute =
-  let rec loop rest ~rev_prefix =
-    match rest with
+  (* Recurs on [rev_prefix] *)
+  let rec loop ~rev_prefix ~suffix =
+    match rev_prefix with
     | [] -> None
-    | attr :: rest ->
+    | attr :: rev_prefix ->
       let { attr_name = { txt = name; loc = attr_loc }; attr_payload } =
         attr
       in
@@ -521,11 +522,11 @@ let find_and_remove_jane_syntax_attribute =
            ~name
            ~embedding_syntax:Attribute
         with
-        | None -> loop rest ~rev_prefix:(attr :: rev_prefix)
-        | Some name -> Some (name, List.rev_append rev_prefix rest)
+        | None -> loop ~rev_prefix ~suffix:(attr :: suffix)
+        | Some name -> Some (name, List.rev_append rev_prefix suffix)
       end
   in
-  fun attributes -> loop attributes ~rev_prefix:[]
+  fun attributes -> loop ~rev_prefix:(List.rev attributes) ~suffix:[]
 ;;
 
 (** For a syntactic category, produce translations into and out of

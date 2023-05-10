@@ -266,12 +266,16 @@ Ptop_def
             expression (//toplevel//[2,1+4]..[2,1+35])
               Pexp_constraint
               expression (//toplevel//[2,1+25]..[2,1+35])
+                attribute "jane.erasable._builtin"
+                  []
                 Pexp_fun
                 Nolabel
                 None
                 pattern (//toplevel//[2,1+29]..[2,1+30])
                   Ppat_var "x" (//toplevel//[2,1+29]..[2,1+30])
                 expression (//toplevel//[2,1+34]..[2,1+35])
+                  attribute "jane.erasable._builtin.end.expression_body"
+                    []
                   Pexp_ident "x" (//toplevel//[2,1+34]..[2,1+35])
               core_type (//toplevel//[2,1+16]..[2,1+22])
                 Ptyp_arrow
@@ -311,12 +315,16 @@ Ptop_def
                         expression (//toplevel//[3,16+9]..[4,46+14])
                           Pexp_constraint
                           expression (//toplevel//[4,46+4]..[4,46+14])
+                            attribute "jane.erasable._builtin"
+                              []
                             Pexp_fun
                             Nolabel
                             None
                             pattern (//toplevel//[4,46+8]..[4,46+9])
                               Ppat_var "x" (//toplevel//[4,46+8]..[4,46+9])
                             expression (//toplevel//[4,46+13]..[4,46+14])
+                              attribute "jane.erasable._builtin.end.expression_body"
+                                []
                               Pexp_ident "x" (//toplevel//[4,46+13]..[4,46+14])
                           core_type (//toplevel//[3,16+21]..[3,16+27])
                             Ptyp_arrow
@@ -351,12 +359,16 @@ Ptop_def
           pattern (//toplevel//[4,17+4]..[4,17+5])
             Ppat_var "x" (//toplevel//[4,17+4]..[4,17+5])
           expression (//toplevel//[4,17+6]..[4,17+29]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[4,17+6]..[4,17+14])
               Ppat_var "contents" (//toplevel//[4,17+6]..[4,17+14])
             expression (//toplevel//[4,17+17]..[4,17+29])
+              attribute "jane.erasable._builtin.end.expression_body"
+                []
               Pexp_record
               [
                 "contents" (//toplevel//[4,17+19]..[4,17+27]) ghost
@@ -402,12 +414,16 @@ Ptop_def
           pattern (//toplevel//[2,1+4]..[2,1+5])
             Ppat_var "x" (//toplevel//[2,1+4]..[2,1+5])
           expression (//toplevel//[2,1+6]..[2,1+35]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[2,1+6]..[2,1+14])
               Ppat_var "contents" (//toplevel//[2,1+6]..[2,1+14])
             expression (//toplevel//[2,1+17]..[2,1+35])
+              attribute "jane.erasable._builtin.end.expression_body"
+                []
               Pexp_record
               [
                 "contents" (//toplevel//[2,1+19]..[2,1+27]) ghost
@@ -433,6 +449,10 @@ Ptop_def
           pattern (//toplevel//[2,1+4]..[2,1+5])
             Ppat_var "x" (//toplevel//[2,1+4]..[2,1+5])
           expression (//toplevel//[2,1+8]..[2,1+41])
+            attribute "jane.erasable._builtin"
+              []
+            attribute "jane.erasable._builtin.end.cases"
+              []
             Pexp_function
             [
               <case>
@@ -459,6 +479,10 @@ Ptop_def
           pattern (//toplevel//[2,1+4]..[2,1+5])
             Ppat_var "x" (//toplevel//[2,1+4]..[2,1+5])
           expression (//toplevel//[2,1+8]..[2,1+47])
+            attribute "jane.erasable._builtin"
+              []
+            attribute "jane.erasable._builtin.end.cases"
+              []
             Pexp_function
             [
               <case>
@@ -490,6 +514,10 @@ Ptop_def
           pattern (//toplevel//[2,1+4]..[2,1+5])
             Ppat_var "x" (//toplevel//[2,1+4]..[2,1+5])
           expression (//toplevel//[2,1+8]..[2,1+44])
+            attribute "jane.erasable._builtin"
+              []
+            attribute "jane.erasable._builtin.end.cases"
+              []
             Pexp_function
             [
               <case>
@@ -539,12 +567,16 @@ Ptop_def
                     expression (//toplevel//[3,9+31]..[3,9+46]) ghost
                       Pexp_poly
                       expression (//toplevel//[3,9+31]..[3,9+46]) ghost
+                        attribute "jane.erasable._builtin"
+                          []
                         Pexp_fun
                         Nolabel
                         None
                         pattern (//toplevel//[3,9+31]..[3,9+34])
                           Ppat_var "foo" (//toplevel//[3,9+31]..[3,9+34])
                         expression (//toplevel//[3,9+37]..[3,9+46])
+                          attribute "jane.erasable._builtin.end.expression_body"
+                            []
                           Pexp_override
                           [
                             <override> "foo" (//toplevel//[3,9+40]..[3,9+43]) ghost
@@ -653,18 +685,22 @@ Ptop_def
           pattern (//toplevel//[6,56+4]..[6,56+12])
             Ppat_var ".@()" (//toplevel//[6,56+4]..[6,56+12])
           expression (//toplevel//[6,56+13]..[6,56+24]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[6,56+13]..[6,56+14])
               Ppat_var "x" (//toplevel//[6,56+13]..[6,56+14])
-            expression (//toplevel//[6,56+15]..[6,56+24]) ghost
+            expression (//toplevel//[6,56+13]..[6,56+24]) ghost
               Pexp_fun
               Nolabel
               None
               pattern (//toplevel//[6,56+15]..[6,56+16])
                 Ppat_var "y" (//toplevel//[6,56+15]..[6,56+16])
               expression (//toplevel//[6,56+19]..[6,56+24])
+                attribute "jane.erasable._builtin.end.expression_body"
+                  []
                 Pexp_apply
                 expression (//toplevel//[6,56+21]..[6,56+22])
                   Pexp_ident "+" (//toplevel//[6,56+21]..[6,56+22])
@@ -686,24 +722,28 @@ Ptop_def
           pattern (//toplevel//[7,81+4]..[7,81+14])
             Ppat_var ".@()<-" (//toplevel//[7,81+4]..[7,81+14])
           expression (//toplevel//[7,81+15]..[7,81+32]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[7,81+15]..[7,81+16])
               Ppat_var "x" (//toplevel//[7,81+15]..[7,81+16])
-            expression (//toplevel//[7,81+17]..[7,81+32]) ghost
+            expression (//toplevel//[7,81+15]..[7,81+32]) ghost
               Pexp_fun
               Nolabel
               None
               pattern (//toplevel//[7,81+17]..[7,81+18])
                 Ppat_var "y" (//toplevel//[7,81+17]..[7,81+18])
-              expression (//toplevel//[7,81+19]..[7,81+32]) ghost
+              expression (//toplevel//[7,81+15]..[7,81+32]) ghost
                 Pexp_fun
                 Nolabel
                 None
                 pattern (//toplevel//[7,81+19]..[7,81+20])
                   Ppat_var "z" (//toplevel//[7,81+19]..[7,81+20])
                 expression (//toplevel//[7,81+23]..[7,81+32])
+                  attribute "jane.erasable._builtin.end.expression_body"
+                    []
                   Pexp_apply
                   expression (//toplevel//[7,81+29]..[7,81+30])
                     Pexp_ident "+" (//toplevel//[7,81+29]..[7,81+30])
@@ -737,18 +777,22 @@ Ptop_def
           pattern (//toplevel//[8,114+4]..[8,114+13])
             Ppat_var ".%.{}" (//toplevel//[8,114+4]..[8,114+13])
           expression (//toplevel//[8,114+14]..[8,114+25]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[8,114+14]..[8,114+15])
               Ppat_var "x" (//toplevel//[8,114+14]..[8,114+15])
-            expression (//toplevel//[8,114+16]..[8,114+25]) ghost
+            expression (//toplevel//[8,114+14]..[8,114+25]) ghost
               Pexp_fun
               Nolabel
               None
               pattern (//toplevel//[8,114+16]..[8,114+17])
                 Ppat_var "y" (//toplevel//[8,114+16]..[8,114+17])
               expression (//toplevel//[8,114+20]..[8,114+25])
+                attribute "jane.erasable._builtin.end.expression_body"
+                  []
                 Pexp_apply
                 expression (//toplevel//[8,114+22]..[8,114+23])
                   Pexp_ident "+" (//toplevel//[8,114+22]..[8,114+23])
@@ -770,24 +814,28 @@ Ptop_def
           pattern (//toplevel//[9,140+4]..[9,140+15])
             Ppat_var ".%.{}<-" (//toplevel//[9,140+4]..[9,140+15])
           expression (//toplevel//[9,140+16]..[9,140+33]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[9,140+16]..[9,140+17])
               Ppat_var "x" (//toplevel//[9,140+16]..[9,140+17])
-            expression (//toplevel//[9,140+18]..[9,140+33]) ghost
+            expression (//toplevel//[9,140+16]..[9,140+33]) ghost
               Pexp_fun
               Nolabel
               None
               pattern (//toplevel//[9,140+18]..[9,140+19])
                 Ppat_var "y" (//toplevel//[9,140+18]..[9,140+19])
-              expression (//toplevel//[9,140+20]..[9,140+33]) ghost
+              expression (//toplevel//[9,140+16]..[9,140+33]) ghost
                 Pexp_fun
                 Nolabel
                 None
                 pattern (//toplevel//[9,140+20]..[9,140+21])
                   Ppat_var "z" (//toplevel//[9,140+20]..[9,140+21])
                 expression (//toplevel//[9,140+24]..[9,140+33])
+                  attribute "jane.erasable._builtin.end.expression_body"
+                    []
                   Pexp_apply
                   expression (//toplevel//[9,140+30]..[9,140+31])
                     Pexp_ident "+" (//toplevel//[9,140+30]..[9,140+31])
@@ -821,18 +869,22 @@ Ptop_def
           pattern (//toplevel//[10,174+4]..[10,174+13])
             Ppat_var ".%.[]" (//toplevel//[10,174+4]..[10,174+13])
           expression (//toplevel//[10,174+14]..[10,174+25]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[10,174+14]..[10,174+15])
               Ppat_var "x" (//toplevel//[10,174+14]..[10,174+15])
-            expression (//toplevel//[10,174+16]..[10,174+25]) ghost
+            expression (//toplevel//[10,174+14]..[10,174+25]) ghost
               Pexp_fun
               Nolabel
               None
               pattern (//toplevel//[10,174+16]..[10,174+17])
                 Ppat_var "y" (//toplevel//[10,174+16]..[10,174+17])
               expression (//toplevel//[10,174+20]..[10,174+25])
+                attribute "jane.erasable._builtin.end.expression_body"
+                  []
                 Pexp_apply
                 expression (//toplevel//[10,174+22]..[10,174+23])
                   Pexp_ident "+" (//toplevel//[10,174+22]..[10,174+23])
@@ -854,24 +906,28 @@ Ptop_def
           pattern (//toplevel//[11,200+4]..[11,200+15])
             Ppat_var ".%.[]<-" (//toplevel//[11,200+4]..[11,200+15])
           expression (//toplevel//[11,200+16]..[11,200+33]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[11,200+16]..[11,200+17])
               Ppat_var "x" (//toplevel//[11,200+16]..[11,200+17])
-            expression (//toplevel//[11,200+18]..[11,200+33]) ghost
+            expression (//toplevel//[11,200+16]..[11,200+33]) ghost
               Pexp_fun
               Nolabel
               None
               pattern (//toplevel//[11,200+18]..[11,200+19])
                 Ppat_var "y" (//toplevel//[11,200+18]..[11,200+19])
-              expression (//toplevel//[11,200+20]..[11,200+33]) ghost
+              expression (//toplevel//[11,200+16]..[11,200+33]) ghost
                 Pexp_fun
                 Nolabel
                 None
                 pattern (//toplevel//[11,200+20]..[11,200+21])
                   Ppat_var "z" (//toplevel//[11,200+20]..[11,200+21])
                 expression (//toplevel//[11,200+24]..[11,200+33])
+                  attribute "jane.erasable._builtin.end.expression_body"
+                    []
                   Pexp_apply
                   expression (//toplevel//[11,200+30]..[11,200+31])
                     Pexp_ident "+" (//toplevel//[11,200+30]..[11,200+31])
@@ -1053,6 +1109,10 @@ Ptop_def
           pattern (//toplevel//[4,28+4]..[4,28+5])
             Ppat_var "f" (//toplevel//[4,28+4]..[4,28+5])
           expression (//toplevel//[4,28+8]..[4,28+37])
+            attribute "jane.erasable._builtin"
+              []
+            attribute "jane.erasable._builtin.end.cases"
+              []
             Pexp_function
             [
               <case>
@@ -1278,24 +1338,28 @@ Ptop_def
             pattern (//toplevel//[2,1+4]..[2,1+5])
               Ppat_var "f" (//toplevel//[2,1+4]..[2,1+5])
             expression (//toplevel//[2,1+6]..[2,1+15]) ghost
+              attribute "jane.erasable._builtin"
+                []
               Pexp_fun
               Nolabel
               None
               pattern (//toplevel//[2,1+6]..[2,1+7])
                 Ppat_var "x" (//toplevel//[2,1+6]..[2,1+7])
-              expression (//toplevel//[2,1+8]..[2,1+15]) ghost
+              expression (//toplevel//[2,1+6]..[2,1+15]) ghost
                 Pexp_fun
                 Nolabel
                 None
                 pattern (//toplevel//[2,1+8]..[2,1+9])
                   Ppat_var "y" (//toplevel//[2,1+8]..[2,1+9])
-                expression (//toplevel//[2,1+10]..[2,1+15]) ghost
+                expression (//toplevel//[2,1+6]..[2,1+15]) ghost
                   Pexp_fun
                   Nolabel
                   None
                   pattern (//toplevel//[2,1+10]..[2,1+11])
                     Ppat_var "z" (//toplevel//[2,1+10]..[2,1+11])
                   expression (//toplevel//[2,1+14]..[2,1+15])
+                    attribute "jane.erasable._builtin.end.expression_body"
+                      []
                     Pexp_ident "x" (//toplevel//[2,1+14]..[2,1+15])
         ]
         expression (//toplevel//[3,20+0]..[5,76+12])
@@ -1362,24 +1426,32 @@ Ptop_def
           pattern (//toplevel//[3,66+4]..[3,66+5])
             Ppat_var "g" (//toplevel//[3,66+4]..[3,66+5])
           expression (//toplevel//[3,66+6]..[5,98+12]) ghost
+            attribute "jane.erasable._builtin"
+              []
             Pexp_fun
             Nolabel
             None
             pattern (//toplevel//[3,66+6]..[3,66+7])
               Ppat_var "y" (//toplevel//[3,66+6]..[3,66+7])
             expression (//toplevel//[4,76+2]..[5,98+12])
+              attribute "jane.erasable._builtin.end.expression_body"
+                []
               Pexp_let Nonrec
               [
                 <def>
                   pattern (//toplevel//[4,76+6]..[4,76+7])
                     Ppat_var "f" (//toplevel//[4,76+6]..[4,76+7])
                   expression (//toplevel//[4,76+8]..[4,76+18]) ghost
+                    attribute "jane.erasable._builtin"
+                      []
                     Pexp_fun
                     Labelled "y"
                     None
                     pattern (//toplevel//[4,76+9]..[4,76+10])
                       Ppat_var "y" (//toplevel//[4,76+9]..[4,76+10])
                     expression (//toplevel//[4,76+13]..[4,76+18])
+                      attribute "jane.erasable._builtin.end.expression_body"
+                        []
                       Pexp_apply
                       expression (//toplevel//[4,76+15]..[4,76+16])
                         Pexp_ident "+" (//toplevel//[4,76+15]..[4,76+16])

@@ -408,6 +408,7 @@ module E = struct
 
   module C = Jane_syntax.Comprehensions
   module IA = Jane_syntax.Immutable_arrays
+  module N_ary = Jane_syntax.N_ary_function
 
   let iter_iterator sub : C.iterator -> _ = function
     | Range { start; stop; direction = _ } ->
@@ -439,10 +440,42 @@ module E = struct
     | Iaexp_immutable_array elts ->
       List.iter (sub.expr sub) elts
 
+  let iter_function_param sub : N_ary.function_param -> _ = function
+    | Pparam_newtype (newtype, loc) ->
+        iter_loc sub newtype;
+        sub.location sub loc
+    | Pparam_val (_label, def, pat) ->
+        Option.iter (sub.expr sub) def;
+        sub.pat sub pat
+
+  let iter_function_constraint sub : N_ary.function_constraint -> _ =
+    fun[@ocaml.warning "+9"] { alloc_mode = _; type_constraint } ->
+      match type_constraint with
+      | Pconstraint ty ->
+          sub.typ sub ty
+      | Pcoerce (ty1, ty2) ->
+          Option.iter (sub.typ sub) ty1;
+          sub.typ sub ty2
+
+  let iter_function_body sub : N_ary.function_body -> _ = function
+    | Pfunction_body expr ->
+        sub.expr sub expr
+    | Pfunction_cases (cases, loc, attrs) ->
+        sub.cases sub cases;
+        sub.location sub loc;
+        sub.attributes sub attrs
+
+  let iter_n_ary_function sub : N_ary.expression -> _ =
+    fun (params, constraint_, body) ->
+      List.iter (iter_function_param sub) params;
+      Option.iter (iter_function_constraint sub) constraint_;
+      iter_function_body sub body
+
   let iter_jst sub : Jane_syntax.Expression.t -> _ = function
     | Jexp_comprehension comp_exp -> iter_comp_exp sub comp_exp
     | Jexp_immutable_array iarr_exp -> iter_iarr_exp sub iarr_exp
     | Jexp_unboxed_constant _ -> iter_constant
+    | Jexp_n_ary_function n_ary_exp -> iter_n_ary_function sub n_ary_exp
 
   let iter sub
         ({pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} as expr)=

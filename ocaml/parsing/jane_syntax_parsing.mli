@@ -236,7 +236,7 @@ val assert_extension_enabled :
    approach for now, but we could revisit this decision if we use it more
    often.
 *)
-(** Extracts the first attribute (in list order) that was inserted by the
+(** Extracts the last attribute (in list order) that was inserted by the
     Jane Syntax framework, and returns the rest of the attributes in the
     same relative order as was input.
 

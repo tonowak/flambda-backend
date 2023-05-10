@@ -484,6 +484,7 @@ module E = struct
   module C = Jane_syntax.Comprehensions
   module IA = Jane_syntax.Immutable_arrays
   module UC = Jane_syntax.Unboxed_constants
+  module N_ary = Jane_syntax.N_ary_function
 
   let map_iterator sub : C.iterator -> C.iterator = function
     | Range { start; stop; direction } ->
@@ -522,12 +523,47 @@ module E = struct
     *)
     | Float _ | Integer _ as x -> x
 
+  let map_function_param sub : N_ary.function_param -> N_ary.function_param =
+    function
+    | Pparam_newtype (newtype, loc) ->
+      Pparam_newtype (map_loc sub newtype, sub.location sub loc)
+    | Pparam_val (label, def, pat) ->
+      Pparam_val (label, Option.map (sub.expr sub) def, sub.pat sub pat)
+
+  let map_type_constraint sub : N_ary.type_constraint -> N_ary.type_constraint =
+    function
+    | Pconstraint ty -> Pconstraint (sub.typ sub ty)
+    | Pcoerce (ty1, ty2) ->
+        Pcoerce (Option.map (sub.typ sub) ty1, sub.typ sub ty2)
+
+  let map_function_constraint sub
+      : N_ary.function_constraint -> N_ary.function_constraint =
+    function
+    | { alloc_mode; type_constraint } ->
+      { alloc_mode; type_constraint = map_type_constraint sub type_constraint }
+
+  let map_function_body sub : N_ary.function_body -> N_ary.function_body =
+    function
+    | Pfunction_body exp -> Pfunction_body (sub.expr sub exp)
+    | Pfunction_cases (cases, loc, attrs) ->
+      Pfunction_cases
+        (sub.cases sub cases, sub.location sub loc, sub.attributes sub attrs)
+
+  let map_n_ary_exp sub : N_ary.expression -> N_ary.expression = function
+    | (params, constraint_, body) ->
+      let params = List.map (map_function_param sub) params in
+      let constraint_ = Option.map (map_function_constraint sub) constraint_ in
+      let body = map_function_body sub body in
+      params, constraint_, body
+
   let map_jst sub : Jane_syntax.Expression.t -> Jane_syntax.Expression.t =
     function
-    | Jexp_comprehension x -> Jexp_comprehension (map_cexp sub x)
-    | Jexp_immutable_array x -> Jexp_immutable_array (map_iaexp sub x)
+    | Jexp_comprehension cexp -> Jexp_comprehension (map_cexp sub cexp)
+    | Jexp_immutable_array iaexp -> Jexp_immutable_array (map_iaexp sub iaexp)
     | Jexp_unboxed_constant x ->
         Jexp_unboxed_constant (map_unboxed_constant_exp sub x)
+    | Jexp_n_ary_function nary_exp ->
+      Jexp_n_ary_function (map_n_ary_exp sub nary_exp)
 
   let map sub
         ({pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} as exp) =

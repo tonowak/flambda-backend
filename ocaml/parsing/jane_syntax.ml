@@ -325,6 +325,255 @@ module Immutable_arrays = struct
     | _ -> failwith "Malformed immutable array pattern"
 end
 
+module N_ary_function = struct
+  let feature : Feature.t = Builtin
+  let extension_string = Feature.extension_component feature
+
+  type function_body =
+    | Pfunction_body of expression
+    | Pfunction_cases of case list * Location.t * attributes
+
+  type function_param =
+    | Pparam_val of arg_label * expression option * pattern
+    | Pparam_newtype of string loc * Location.t
+
+  type type_constraint =
+    | Pconstraint of core_type
+    | Pcoerce of core_type option * core_type
+
+  type alloc_mode = Local | Global
+
+  type function_constraint =
+    { alloc_mode: alloc_mode;
+      type_constraint: type_constraint;
+    }
+
+  type expression =
+    function_param list * function_constraint option * function_body
+
+  module Extension_node = struct
+    type t =
+      | End_cases
+      | End_expression_body
+      | Alloc_mode of alloc_mode
+
+    let to_extension_suffix = function
+      | End_cases -> ["end"; "cases" ]
+      | End_expression_body -> [ "end"; "expression_body" ]
+      | Alloc_mode Global -> [ "alloc_mode"; "global" ]
+      | Alloc_mode Local -> [ "alloc_mode"; "local" ]
+
+    let of_extension_suffix = function
+      | [ "end"; "cases" ] -> Some End_cases
+      | [ "end"; "expression_body" ] -> Some End_expression_body
+      | [ "alloc_mode"; "global" ] -> Some (Alloc_mode Global)
+      | [ "alloc_mode"; "local" ] -> Some (Alloc_mode Local)
+      | _ -> None
+
+    let format ppf t =
+      Embedded_name.pp_quoted_name
+        ppf
+        (Embedded_name.of_feature feature (to_extension_suffix t))
+  end
+
+  module Extension_node_with_payload = struct
+    type t =
+      | End_cases of case list
+      | End_expression_body
+      | Alloc_mode of alloc_mode
+  end
+
+  module Desugaring_error = struct
+    type error =
+      | Non_syntactic_arity_embedding of Embedded_name.t
+      | Missing_closing_embedding
+      | Missing_alloc_mode
+      | Misannotated_function_cases
+      | Bad_syntactic_arity_embedding of string list
+
+    let report_error ~loc = function
+      | Non_syntactic_arity_embedding name ->
+          Location.errorf ~loc
+            "Tried to desugar the non-syntactic-arity embedded term \
+             %a as part of a syntactic-arity expression. The \
+             embedding should start with %a."
+            Embedded_name.pp_quoted_name name
+            Embedded_name.pp_quoted_name (Embedded_name.of_feature feature [])
+      | Missing_closing_embedding ->
+          Location.errorf ~loc
+            "Expected a syntactic-arity embedding delimiting the end of \
+             the n-ary function before reaching a node of this kind. The only \
+             legal construct is a nested sequence of Pexp_fun and Pexp_newtype \
+             nodes, optionally followed by a Pexp_coerce or Pexp_constraint \
+             node, ending in %a or %a."
+            Extension_node.format Extension_node.End_cases
+            Extension_node.format Extension_node.End_expression_body
+      | Missing_alloc_mode ->
+          Location.errorf ~loc
+            "Expected the alloc mode to be indicated on a Pexp_coerce or \
+             Pexp_constraint node within an n-ary function: one of \
+             %a or %a."
+            Extension_node.format (Extension_node.Alloc_mode Global)
+            Extension_node.format (Extension_node.Alloc_mode Local)
+      | Misannotated_function_cases ->
+          Location.errorf ~loc
+            "%a may be applied only to a function expression."
+            Extension_node.format Extension_node.End_cases
+      | Bad_syntactic_arity_embedding suffix ->
+          Location.errorf ~loc
+            "Unknown syntactic-arity extension point \"%a\"."
+            Embedded_name.pp_quoted_name
+            (Embedded_name.of_feature feature suffix)
+
+    exception Error of Location.t * error
+
+    let () =
+      Location.register_error_of_exn
+        (function
+          | Error(loc, err) -> Some (report_error ~loc err)
+          | _ -> None)
+
+    let raise expr err = raise (Error (expr.pexp_loc, err))
+  end
+
+  let expand_n_ary_expr expr =
+    match find_and_remove_jane_syntax_attribute expr.pexp_attributes with
+    | None -> None
+    | Some (ext_name, attributes) -> begin
+        let expr = { expr with pexp_attributes = attributes } in
+        match Jane_syntax_parsing.Embedded_name.components ext_name with
+        | feature :: suffix
+          when String.equal feature extension_string -> begin
+            match Extension_node.of_extension_suffix suffix with
+            | Some ext -> Some (ext, expr)
+            | None ->
+              Desugaring_error.raise
+                expr
+                (Bad_syntactic_arity_embedding suffix)
+          end
+        | _ :: _ ->
+          Desugaring_error.raise
+            expr
+            (Non_syntactic_arity_embedding ext_name)
+      end
+
+  let expand_n_ary_expr_with_payload expr
+      : (Extension_node_with_payload.t * Parsetree.expression) option
+    =
+    match expand_n_ary_expr expr with
+    | None -> None
+    | Some (End_cases, ({ pexp_desc = Pexp_function cases } as expr)) ->
+        Some (End_cases cases, expr)
+    | Some (End_cases, expr) ->
+        Desugaring_error.raise expr Misannotated_function_cases
+    | Some (End_expression_body, expr) -> Some (End_expression_body, expr)
+    | Some (Alloc_mode alloc_mode, expr) -> Some (Alloc_mode alloc_mode, expr)
+
+  let check_end expr ~rev_params ~function_constraint =
+    match expand_n_ary_expr_with_payload expr with
+    | None | Some (Alloc_mode _, _) -> None
+    | Some (End_cases cases, expr) ->
+        let { pexp_loc = loc; pexp_attributes = attrs } = expr in
+        let params = List.rev rev_params in
+        Some (params, function_constraint, Pfunction_cases (cases, loc, attrs))
+    | Some (End_expression_body, expr) ->
+        let params = List.rev rev_params in
+        Some (params, function_constraint, Pfunction_body expr)
+
+  let require_alloc_mode expr =
+    match expand_n_ary_expr expr with
+    | Some (Alloc_mode alloc_mode, _) -> alloc_mode
+    | _ -> Desugaring_error.raise expr Missing_alloc_mode
+
+  let require_end expr ~rev_params ~type_constraint ~alloc_mode =
+    match
+      check_end
+        expr
+        ~rev_params
+        ~function_constraint:(Some { type_constraint; alloc_mode })
+    with
+    | Some result -> result
+    | None ->
+        Desugaring_error.raise expr Missing_closing_embedding
+
+  (* Returns remaining unconsumed attributes on outermost expression *)
+  let of_expr =
+    let rec loop expr ~rev_params =
+      match check_end expr ~function_constraint:None ~rev_params with
+      | Some result -> result
+      | None -> begin
+          match expr.pexp_desc with
+          | Pexp_fun (label, default, pat, body) ->
+              let param = Pparam_val (label, default, pat) in
+              loop body ~rev_params:(param :: rev_params)
+          | Pexp_newtype (newtype, body) ->
+              let loc = { newtype.loc with loc_ghost = true } in
+              let param = Pparam_newtype (newtype, loc) in
+              loop body ~rev_params:(param :: rev_params)
+          | Pexp_constraint (body, ty) ->
+              let alloc_mode = require_alloc_mode expr in
+              let type_constraint = Pconstraint ty in
+              require_end body ~rev_params ~alloc_mode ~type_constraint
+          | Pexp_coerce (body, ty1, ty2) ->
+              let alloc_mode = require_alloc_mode expr in
+              let type_constraint = Pcoerce (ty1, ty2) in
+              require_end body ~rev_params ~alloc_mode ~type_constraint
+          | _ -> Desugaring_error.raise expr Missing_closing_embedding
+        end
+    in
+    fun expr ->
+      match expr.pexp_desc with
+      | Pexp_function _ | Pexp_fun _ | Pexp_newtype _ -> begin
+          match expand_n_ary_expr_with_payload expr with
+          | Some (End_cases cases, expr) ->
+              (* If the outermost node is [End_cases], we place the attributes
+                 on the function node as a whole rather than on the
+                 [Pfunction_cases] body.
+              *)
+              let { pexp_loc = loc; pexp_attributes = attrs } = expr in
+              let n_ary =
+                [], None, Pfunction_cases (cases, loc, [])
+              in
+              Some (n_ary, attrs)
+          | _ -> Some (loop expr ~rev_params:[], expr.pexp_attributes)
+      end
+      | _ -> None
+
+  let n_ary_function_expr ext x =
+    let suffix = Extension_node.to_extension_suffix ext in
+    Expression.make_jane_syntax feature suffix x
+
+  let expr_of ~loc (params, constraint_, body) =
+    (* See Note [Wrapping with make_entire_jane_syntax] *)
+    Expression.make_entire_jane_syntax ~loc feature (fun () ->
+      let body =
+        match body with
+        | Pfunction_body body ->
+            n_ary_function_expr End_expression_body body
+        | Pfunction_cases (cases, loc, attrs) ->
+            n_ary_function_expr End_cases
+              (Ast_helper.Exp.function_ cases ~loc ~attrs)
+      in
+      let constrained_body =
+        match constraint_ with
+        | None -> body
+        | Some { type_constraint; alloc_mode } ->
+            n_ary_function_expr (Alloc_mode alloc_mode)
+              (match type_constraint with
+              | Pconstraint ty -> Ast_helper.Exp.constraint_ body ty
+              | Pcoerce (ty1, ty2) -> Ast_helper.Exp.coerce body ty1 ty2)
+      in
+      List.fold_right
+        (fun param body ->
+          match param with
+          | Pparam_val (label, default, pat) ->
+              Ast_helper.Exp.fun_ label default pat body
+          | Pparam_newtype (newtype, loc) ->
+              Ast_helper.Exp.newtype newtype body ~loc)
+        params
+        constrained_body)
+end
+
 (** [include functor] *)
 module Include_functor = struct
   type signature_item =
@@ -464,6 +713,7 @@ module Expression = struct
     | Jexp_comprehension   of Comprehensions.expression
     | Jexp_immutable_array of Immutable_arrays.expression
     | Jexp_unboxed_constant of Unboxed_constants.expression
+    | Jexp_n_ary_function  of N_ary_function.expression
 
   let of_ast_internal (feat : Feature.t) expr = match feat with
     | Language_extension Comprehensions ->
@@ -473,8 +723,13 @@ module Expression = struct
       let expr, attrs = Immutable_arrays.of_expr expr in
       Some (Jexp_immutable_array expr, attrs)
     | Language_extension Layouts ->
-      let expr, attrs = Unboxed_constants.of_expr expr in
-      Some (Jexp_unboxed_constant expr, attrs)
+        let expr, attrs = Unboxed_constants.of_expr expr in
+        Some (Jexp_unboxed_constant expr, attrs)
+    | Builtin -> begin
+        match N_ary_function.of_expr expr with
+        | Some (expr, attrs) -> Some (Jexp_n_ary_function expr, attrs)
+        | None -> None
+      end
     | _ -> None
 
   let of_ast = Expression.make_of_ast ~of_ast_internal
@@ -485,6 +740,7 @@ module Expression = struct
       | Jexp_comprehension x    -> Comprehensions.expr_of    ~loc x
       | Jexp_immutable_array x  -> Immutable_arrays.expr_of  ~loc x
       | Jexp_unboxed_constant x -> Unboxed_constants.expr_of ~loc x
+      | Jexp_n_ary_function   x -> N_ary_function.expr_of    ~loc x
     in
     (* See Note [Outer attributes at end] *)
     { expr with pexp_attributes = expr.pexp_attributes @ attrs }
