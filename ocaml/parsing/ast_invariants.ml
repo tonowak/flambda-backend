@@ -27,7 +27,9 @@ let complex_id loc = err loc "Functor application not allowed here."
 let module_type_substitution_missing_rhs loc =
   err loc "Module type substitution with no right hand side"
 let empty_comprehension loc = err loc "Comprehension with no clauses"
-let no_val_params loc = err loc "Function with no value parameters"
+let no_val_params loc = err loc "Functions must have a value parameter."
+let non_jane_syntax_function loc =
+  err loc "Functions must be constructed using Jane Street syntax."
 
 let simple_longident id =
   let rec is_simple = function
@@ -124,6 +126,7 @@ let iterator =
     | Pexp_new id -> simple_longident id
     | Pexp_record (fields, _) ->
       List.iter (fun (id, _) -> simple_longident id) fields
+    | Pexp_function _ | Pexp_fun _ -> non_jane_syntax_function loc
     | _ -> ()
   in
   let extension_constructor self ec =
