@@ -753,24 +753,23 @@ let mkghost_newtype_function_body newtypes body_constraint body =
   in
   expr.pexp_desc
 
-(* In addition to the exp_desc, this returns the attributes inserted by the Jane
-   Syntax framework.
-*)
-let mkfunction ~loc params body_constraint body =
+let n_ary_function expr ~attrs ~loc =
+  wrap_exp_attrs ~loc (N_ary.expr_of expr ~loc:(make_loc loc)) attrs
+
+let mkfunction ~loc ~attrs params body_constraint body =
   match body with
   | N_ary.Pfunction_cases _ ->
-      N_ary.expr_of (params, body_constraint, body) ~loc:(make_loc loc)
+      n_ary_function (params, body_constraint, body) ~loc ~attrs
   | N_ary.Pfunction_body body_exp -> begin
     (* If all the params are newtypes, then we don't create a function node;
        we create a newtype node. *)
       match all_params_as_newtypes params with
-      | None ->
-          N_ary.expr_of (params, body_constraint, body) ~loc:(make_loc loc)
+      | None -> n_ary_function (params, body_constraint, body) ~loc ~attrs
       | Some newtypes ->
           let desc =
             mkghost_newtype_function_body newtypes body_constraint body_exp
           in
-          mkexp ~loc desc
+          mkexp_attrs ~loc desc attrs
     end
 
 (* Alternatively, we could keep the generic module type in the Parsetree
@@ -2538,10 +2537,8 @@ class_type_declarations:
   | FUNCTION ext_attributes match_cases
       { let loc = make_loc $sloc in
         let cases = $3 in
-        let exp =
-          mkfunction [] None (Pfunction_cases (cases, loc, [])) ~loc:$sloc
-        in
-        wrap_exp_attrs ~loc:$sloc exp $2
+        mkfunction [] None (Pfunction_cases (cases, loc, []))
+          ~loc:$sloc ~attrs:$2
       }
 ;
 
@@ -2670,6 +2667,19 @@ fun_expr:
   | expr_attrs
       { let desc, attrs = $1 in
         mkexp_attrs ~loc:$sloc desc attrs }
+    /* Cf #5939: we used to accept (fun p when e0 -> e) */
+  | FUN ext_attributes fun_params preceded(COLON, atomic_type)?
+      MINUSGREATER fun_body
+      { let body_constraint =
+          Option.map
+            (fun x : N_ary.function_constraint ->
+              { type_constraint = Pconstraint x
+              ; alloc_mode = Global
+              })
+          $4
+        in
+        mkfunction $3 body_constraint $6 ~loc:$sloc ~attrs:$2
+      }
   | mkexp(expr_)
       { $1 }
   | let_bindings(ext) IN seq_expr
@@ -2713,21 +2723,6 @@ fun_expr:
       { let open_loc = make_loc ($startpos($2), $endpos($5)) in
         let od = Opn.mk $5 ~override:$3 ~loc:open_loc in
         Pexp_open(od, $7), $4 }
-  /* Cf #5939: we used to accept (fun p when e0 -> e) */
-  | FUN ext_attributes fun_params preceded(COLON, atomic_type)?
-        MINUSGREATER fun_body
-      { let body_constraint =
-          Option.map
-            (fun x : N_ary.function_constraint ->
-               { type_constraint = Pconstraint x
-               ; alloc_mode = Global
-               })
-            $4
-        in
-        let ext, attrs = $2 in
-        let expr = mkfunction $3 body_constraint $6 ~loc:$sloc in
-        expr.pexp_desc, (ext, attrs @ expr.pexp_attributes)
-      }
   | MATCH ext_attributes seq_expr WITH match_cases
       { Pexp_match($3, $5), $2 }
   | TRY ext_attributes seq_expr WITH match_cases
@@ -3128,7 +3123,7 @@ strict_binding(value_param_alloc_mode):
         | None -> None
         | Some type_constraint -> Some { type_constraint; alloc_mode = $5 }
       in
-      let exp = mkfunction $1 constraint_ $4 ~loc:$sloc in
+      let exp = mkfunction $1 constraint_ $4 ~loc:$sloc ~attrs:(None, []) in
       { exp with pexp_loc = { exp.pexp_loc with loc_ghost = true } }
     }
 ;
@@ -3140,8 +3135,8 @@ fun_body:
         | Some _ ->
           (* function%foo extension nodes interrupt the arity *)
           let cases = N_ary.Pfunction_cases ($3, make_loc $sloc, []) in
-          let function_ = mkfunction [] None cases ~loc:$sloc in
-          N_ary.Pfunction_body (wrap_exp_attrs ~loc:$sloc function_ $2)
+          let function_ = mkfunction [] None cases ~loc:$sloc ~attrs:$2 in
+          N_ary.Pfunction_body function_
       }
   | fun_seq_expr
       { N_ary.Pfunction_body $1 }

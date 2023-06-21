@@ -73,6 +73,8 @@
                             expression (shortcut_ext_attr.ml[14,294+3]..[14,294+24])
                               attribute "foo"
                                 []
+                              attribute "jane.erasable._builtin.param"
+                                []
                               attribute "jane.erasable._builtin"
                                 []
                               Pexp_fun
@@ -81,7 +83,7 @@
                               pattern (shortcut_ext_attr.ml[14,294+17]..[14,294+18])
                                 Ppat_var "x" (shortcut_ext_attr.ml[14,294+17]..[14,294+18])
                               expression (shortcut_ext_attr.ml[14,294+22]..[14,294+24])
-                                attribute "jane.erasable._builtin.end.expression_body"
+                                attribute "jane.erasable._builtin.end"
                                   []
                                 Pexp_construct "()" (shortcut_ext_attr.ml[14,294+22]..[14,294+24])
                                 None
@@ -96,9 +98,9 @@
                               expression (shortcut_ext_attr.ml[15,322+3]..[15,322+29])
                                 attribute "foo"
                                   []
-                                attribute "jane.erasable._builtin"
-                                  []
                                 attribute "jane.erasable._builtin.end.cases"
+                                  []
+                                attribute "jane.erasable._builtin"
                                   []
                                 Pexp_function
                                 [
