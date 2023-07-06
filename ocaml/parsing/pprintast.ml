@@ -1391,7 +1391,6 @@ and payload ctxt f = function
       pp f " when "; expression ctxt f e
 
 and pp_print_pexp_function ctxt sep f x =
-  (* CR nroberts: can we get rid of this? *)
   (* do not print [@extension.local] on expressions *)
   let attrs, _ = check_local_attr x.pexp_attributes in
   let x = { x with pexp_attributes = attrs } in
