@@ -553,7 +553,8 @@ module Make_with_attribute
         ; attr_payload = PStr []
         }
       in
-      with_attributes ast (attr :: attributes ast)
+      (* See Note [Outer attributes at end] *)
+      with_attributes ast (attributes ast @ [ attr ])
 
     let match_jane_syntax ast =
       match find_and_remove_jane_syntax_attribute (attributes ast) with

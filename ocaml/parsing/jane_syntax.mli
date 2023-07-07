@@ -61,9 +61,7 @@ module Comprehensions : sig
         [:BODY ...CLAUSES...:] (flag = Immutable)
           (only allowed with [-extension immutable_arrays]) *)
 
-  val expr_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    expression -> Parsetree.expression
+  val expr_of : loc:Location.t -> expression -> Parsetree.expression
 end
 
 (** The ASTs for immutable arrays.  When we merge this upstream, we'll merge
@@ -78,12 +76,8 @@ module Immutable_arrays : sig
     | Iapat_immutable_array of Parsetree.pattern list
     (** [: P1; ...; Pn :] **)
 
-  val expr_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    expression -> Parsetree.expression
-  val pat_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    pattern -> Parsetree.pattern
+  val expr_of : loc:Location.t -> expression -> Parsetree.expression
+  val pat_of : loc:Location.t -> pattern -> Parsetree.pattern
 end
 
 (** The ASTs for [include functor].  When we merge this upstream, we'll merge
@@ -105,9 +99,7 @@ module Strengthen : sig
   type module_type =
     { mty : Parsetree.module_type; mod_id : Longident.t Location.loc }
 
-  val mty_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    module_type -> Parsetree.module_type
+  val mty_of : loc:Location.t -> module_type -> Parsetree.module_type
 end
 
 (** The ASTs for unboxed literals, like #4.0 *)
@@ -119,13 +111,8 @@ module Unboxed_constants : sig
   type expression = t
   type pattern = t
 
-  val expr_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    expression -> Parsetree.expression
-
-  val pat_of :
-    loc:Location.t -> attrs:Parsetree.attributes ->
-    pattern -> Parsetree.pattern
+  val expr_of : loc:Location.t -> expression -> Parsetree.expression
+  val pat_of : loc:Location.t -> pattern -> Parsetree.pattern
 end
 
 (******************************************)
@@ -260,6 +247,9 @@ module Module_type : sig
   include AST
     with type t := t * Parsetree.attributes
      and type ast := Parsetree.module_type
+
+  val mty_of :
+    loc:Location.t -> attrs:Parsetree.attributes -> t -> Parsetree.module_type
 end
 
 (** Novel syntax in signature items *)

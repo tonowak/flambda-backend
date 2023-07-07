@@ -350,7 +350,7 @@ end
 
 let ppat_iarray loc elts =
   Jane_syntax.Immutable_arrays.pat_of
-    ~loc:(make_loc loc) ~attrs:[]
+    ~loc:(make_loc loc)
     (Iapat_immutable_array elts)
 
 let expecting loc nonterm =
@@ -801,15 +801,13 @@ end = struct
     | Value const_value ->
         mkexp ~loc (Pexp_constant const_value)
     | Unboxed const_unboxed ->
-      Jane_syntax.Unboxed_constants.expr_of
-        ~loc:(make_loc loc) ~attrs:[] const_unboxed
+      Jane_syntax.Unboxed_constants.expr_of ~loc:(make_loc loc) const_unboxed
 
   let to_pattern ~loc : t -> pattern = function
     | Value const_value ->
         mkpat ~loc (Ppat_constant const_value)
     | Unboxed const_unboxed ->
-      Jane_syntax.Unboxed_constants.pat_of
-        ~loc:(make_loc loc) ~attrs:[] const_unboxed
+      Jane_syntax.Unboxed_constants.pat_of ~loc:(make_loc loc) const_unboxed
 
   let assert_is_value ~loc ~where : t -> Parsetree.constant = function
     | Value x -> x
@@ -2664,7 +2662,7 @@ simple_expr:
           ~loc:$sloc
           (fun ~loc elts ->
              Jane_syntax.Immutable_arrays.expr_of
-               ~loc:(make_loc loc) ~attrs:[]
+               ~loc:(make_loc loc)
                (Iaexp_immutable_array elts))
         $1
       }
@@ -2738,7 +2736,7 @@ comprehension_clause:
 
 %inline comprehension_expr:
   comprehension_ext_expr
-    { Jane_syntax.Comprehensions.expr_of ~loc:(make_loc $sloc) ~attrs:[] $1 }
+    { Jane_syntax.Comprehensions.expr_of ~loc:(make_loc $sloc) $1 }
 ;
 
 %inline array_simple(ARR_OPEN, ARR_CLOSE, contents_semi_list):

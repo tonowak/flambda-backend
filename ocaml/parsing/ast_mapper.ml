@@ -320,8 +320,8 @@ module MT = struct
     match Jane_syntax.Module_type.of_ast mty with
     | Some (jmty, attrs) -> begin
         let attrs = sub.attributes sub attrs in
-        match sub.module_type_jane_syntax sub jmty with
-        | Jmty_strengthen smty -> Jane_syntax.Strengthen.mty_of ~loc ~attrs smty
+        Jane_syntax.Module_type.mty_of ~loc ~attrs
+          (sub.module_type_jane_syntax sub jmty)
       end
     | None ->
     let attrs = sub.attributes sub attrs in
