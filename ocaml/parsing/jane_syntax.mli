@@ -80,7 +80,7 @@ module Immutable_arrays : sig
   val pat_of : loc:Location.t -> pattern -> Parsetree.pattern
 end
 
-module N_ary_function : sig
+module N_ary_functions : sig
   type function_body =
     | Pfunction_body of Parsetree.expression
     | Pfunction_cases of Parsetree.case list * Location.t * Parsetree.attributes
@@ -267,7 +267,7 @@ module Expression : sig
     | Jexp_comprehension    of Comprehensions.expression
     | Jexp_immutable_array  of Immutable_arrays.expression
     | Jexp_unboxed_constant of Unboxed_constants.expression
-    | Jexp_n_ary_function   of N_ary_function.expression
+    | Jexp_n_ary_function   of N_ary_functions.expression
 
   include AST
     with type t := t * Parsetree.attributes

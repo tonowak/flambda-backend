@@ -3598,7 +3598,7 @@ let is_local_returning_function cases =
 let loc_rest_of_function
     ~(loc_function : Location.t) params_suffix body : Location.t
   =
-  let open Jane_syntax.N_ary_function in
+  let open Jane_syntax.N_ary_functions in
   match params_suffix, body with
   | param :: _, _ ->
       let loc_start =
@@ -3686,7 +3686,7 @@ let type_pattern_approx env spat ty_expected =
   | _ -> ()
 
 let type_approx_constraint ~loc env constraint_ ty_expected =
-  let open Jane_syntax.N_ary_function in
+  let open Jane_syntax.N_ary_functions in
   match constraint_ with
   | Pconstraint sty ->
       let ty_expected' = approx_type env sty in
@@ -3702,7 +3702,7 @@ let type_approx_constraint ~loc env constraint_ ty_expected =
       ty_expected
 
 let type_approx_constraint_opt ~loc env constraint_ ty_expected =
-  let open Jane_syntax.N_ary_function in
+  let open Jane_syntax.N_ary_functions in
   match constraint_ with
   | None -> ty_expected
   | Some { type_constraint; alloc_mode = _ } ->
@@ -3800,7 +3800,7 @@ and type_approx_aux_jane_syntax
 
 and type_approx_function =
   let rec loop env params c body ty_expected ~in_function ~first =
-    let open Jane_syntax.N_ary_function in
+    let open Jane_syntax.N_ary_functions in
     let loc_function, _ = in_function in
     let loc = loc_rest_of_function ~loc_function params body in
     (* We can approximate types up to the first newtype parameter, whereupon
@@ -7518,11 +7518,11 @@ and type_expect_jane_syntax
 
 and type_n_ary_function
       ~loc ~env ~expected_mode ~ty_expected ~explanation ~attributes
-      ((params, constraint_, body) : Jane_syntax.N_ary_function.expression)
+      ((params, constraint_, body) : Jane_syntax.N_ary_functions.expression)
     =
     (* TODO nroberts: in later commit, actually typecheck this. *)
     let open Ast_helper in
-    let open Jane_syntax.N_ary_function in
+    let open Jane_syntax.N_ary_functions in
     let fun_body =
       match body with
       | Pfunction_body body -> body

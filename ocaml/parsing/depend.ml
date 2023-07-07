@@ -341,20 +341,20 @@ and add_immutable_array_expr bv : Jane_syntax.Immutable_arrays.expression -> _ =
   function
   | Iaexp_immutable_array exprs -> List.iter (add_expr bv) exprs
 
-and add_n_ary_function bv : Jane_syntax.N_ary_function.expression -> _ =
+and add_n_ary_function bv : Jane_syntax.N_ary_functions.expression -> _ =
   fun (params, constraint_, body) ->
     let bv = List.fold_left add_function_param bv params in
     add_opt add_function_constraint bv constraint_;
     add_function_body bv body
 
-and add_function_param bv : Jane_syntax.N_ary_function.function_param -> _ =
+and add_function_param bv : Jane_syntax.N_ary_functions.function_param -> _ =
   function
   | Pparam_val (_, opte, pat) ->
     add_opt add_expr bv opte;
     add_pattern bv pat
   | Pparam_newtype _ -> bv
 
-and add_function_body bv : Jane_syntax.N_ary_function.function_body -> _ =
+and add_function_body bv : Jane_syntax.N_ary_functions.function_body -> _ =
   function
   | Pfunction_body e ->
     add_expr bv e
@@ -362,7 +362,7 @@ and add_function_body bv : Jane_syntax.N_ary_function.function_body -> _ =
     add_cases bv cases
 
 and add_function_constraint bv
-    : Jane_syntax.N_ary_function.function_constraint -> _ =
+    : Jane_syntax.N_ary_functions.function_constraint -> _ =
   fun[@ocaml.warning "+9"] { alloc_mode = _; type_constraint } ->
     match type_constraint with
     | Pconstraint ty ->

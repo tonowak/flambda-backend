@@ -253,7 +253,7 @@ open Parsetree
 open Ast_helper
 open Docstrings
 open Docstrings.WithMenhir
-module N_ary = Jane_syntax.N_ary_function
+module N_ary = Jane_syntax.N_ary_functions
 
 let mkloc = Location.mkloc
 let mknoloc = Location.mknoloc

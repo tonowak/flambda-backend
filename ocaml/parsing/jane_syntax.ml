@@ -325,7 +325,7 @@ module Immutable_arrays = struct
     | _ -> failwith "Malformed immutable array pattern"
 end
 
-module N_ary_function = struct
+module N_ary_functions = struct
   let feature : Feature.t = Builtin
   let extension_string = Feature.extension_component feature
 
@@ -740,7 +740,7 @@ module Expression = struct
     | Jexp_comprehension   of Comprehensions.expression
     | Jexp_immutable_array of Immutable_arrays.expression
     | Jexp_unboxed_constant of Unboxed_constants.expression
-    | Jexp_n_ary_function  of N_ary_function.expression
+    | Jexp_n_ary_function  of N_ary_functions.expression
 
   let of_ast_internal (feat : Feature.t) expr = match feat with
     | Language_extension Comprehensions ->
@@ -753,7 +753,7 @@ module Expression = struct
         let expr, attrs = Unboxed_constants.of_expr expr in
         Some (Jexp_unboxed_constant expr, attrs)
     | Builtin -> begin
-        match N_ary_function.of_expr expr with
+        match N_ary_functions.of_expr expr with
         | Some (expr, attrs) -> Some (Jexp_n_ary_function expr, attrs)
         | None -> None
       end
@@ -767,7 +767,7 @@ module Expression = struct
       | Jexp_comprehension x    -> Comprehensions.expr_of    ~loc x
       | Jexp_immutable_array x  -> Immutable_arrays.expr_of  ~loc x
       | Jexp_unboxed_constant x -> Unboxed_constants.expr_of ~loc x
-      | Jexp_n_ary_function   x -> N_ary_function.expr_of    ~loc x
+      | Jexp_n_ary_function   x -> N_ary_functions.expr_of    ~loc x
     in
     (* See Note [Outer attributes at end] *)
     { expr with pexp_attributes = expr.pexp_attributes @ attrs }

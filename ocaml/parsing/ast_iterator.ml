@@ -408,7 +408,7 @@ module E = struct
 
   module C = Jane_syntax.Comprehensions
   module IA = Jane_syntax.Immutable_arrays
-  module N_ary = Jane_syntax.N_ary_function
+  module N_ary = Jane_syntax.N_ary_functions
 
   let iter_iterator sub : C.iterator -> _ = function
     | Range { start; stop; direction = _ } ->

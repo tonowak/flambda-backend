@@ -75,7 +75,7 @@ let iterator =
     | _ -> ()
   in
   let n_ary_function loc (params, _constraint, body) =
-    let open Jane_syntax.N_ary_function in
+    let open Jane_syntax.N_ary_functions in
     match body with
     | Pfunction_cases _ -> ()
     | Pfunction_body _ ->
