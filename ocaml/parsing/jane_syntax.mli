@@ -85,9 +85,15 @@ module N_ary_functions : sig
   (** These types use the [P] prefix to match how they are represented in the
       upstream compiler *)
 
+  (** See the comment on [expression]. *)
   type function_body =
     | Pfunction_body of Parsetree.expression
     | Pfunction_cases of Parsetree.case list * Location.t * Parsetree.attributes
+    (** In [Pfunction_cases (_, loc, attrs)], the location extends from the
+        start of the [function] keyword to the end of the last case. The
+        compiler will only use typechecking-related attributes from [attrs],
+        e.g. enabling or disabling a warning.
+    *)
 
   type function_param =
     | Pparam_val of
@@ -115,20 +121,51 @@ module N_ary_functions : sig
         the location of the [(type x)] as a whole.
 
         Multiple parameters [(type a b c)] are represented as multiple
-        [Pparam_newtype] nodes.
+        [Pparam_newtype] nodes, let's say:
+
+        {[ [ Pparam_newtype (a, loc1);
+             Pparam_newtype (b, loc2);
+             Pparam_newtype (c, loc3);
+           ]
+        ]}
+
+        Here, the first loc [loc1] is the location of [(type a b c)], and the
+        subsequent locs [loc2] and [loc3] are the same as [loc1], except marked
+        as ghost locations. The locations on [a], [b], [c], correspond to the
+        variables [a], [b], and [c] in the source code.
     *)
 
   type type_constraint =
     | Pconstraint of Parsetree.core_type
     | Pcoerce of Parsetree.core_type option * Parsetree.core_type
 
-  type alloc_mode = Local | Global
+  (** Whether the type annotation on a function should be interpreted in the
+      local or global mode. *)
+  type alloc_mode =
+    | Local
+      (** Corresponds to declarations like [let local_ f x : ty1 -> ty2 = e] *)
+    | Global
+      (** Corresponds to declarations like [let f x : ty1 -> ty2 = e] *)
 
   type function_constraint =
     { alloc_mode: alloc_mode;
       type_constraint: type_constraint;
     }
 
+  (** [([P1; ...; Pn], C, body)] represents any construct
+      involving [fun] or [function], including:
+      - [fun P1 ... Pn -> E]
+        when [body = Pfunction_body E]
+      - [fun P1 ... Pn -> function p1 -> e1 | ... | pm -> em]
+        when [body = Pfunction_cases [ p1 -> e1; ...; pm -> em ]]
+
+      [C] represents a type constraint or coercion placed immediately
+      before the arrow, e.g. [fun P1 ... Pn : t1 :> t2 -> ...]
+      when [C = Some (Pcoerce (Some t1, t2))].
+
+      A function must have parameters. [Pexp_function (params, _, body)] must
+      have non-empty [params] or a [Pfunction_cases _] body.
+  *)
   type expression =
     function_param list * function_constraint option * function_body
 
