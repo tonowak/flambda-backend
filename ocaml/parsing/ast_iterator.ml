@@ -449,6 +449,8 @@ module E = struct
         sub.pat sub pat
 
   let iter_function_constraint sub : N_ary.function_constraint -> _ =
+    (* Enable warning 9 to ensure that the record pattern doesn't miss any
+       field. *)
     fun[@ocaml.warning "+9"] { alloc_mode = _; type_constraint } ->
       match type_constraint with
       | Pconstraint ty ->

@@ -769,8 +769,12 @@ module Expression = struct
       | Jexp_unboxed_constant x -> Unboxed_constants.expr_of ~loc x
       | Jexp_n_ary_function   x -> N_ary_functions.expr_of    ~loc x
     in
-    (* See Note [Outer attributes at end] *)
-    { expr with pexp_attributes = expr.pexp_attributes @ attrs }
+    (* Performance hack: save an allocation if [attrs] is empty. *)
+    match attrs with
+    | [] -> expr
+    | _ :: _ as attrs ->
+        (* See Note [Outer attributes at end] *)
+        { expr with pexp_attributes = expr.pexp_attributes @ attrs }
 end
 
 module Pattern = struct
@@ -795,8 +799,12 @@ module Pattern = struct
       | Jpat_immutable_array x -> Immutable_arrays.pat_of ~loc x
       | Jpat_unboxed_constant x -> Unboxed_constants.pat_of ~loc x
     in
-    (* See Note [Outer attributes at end] *)
-    { pat with ppat_attributes = pat.ppat_attributes @ attrs }
+    (* Performance hack: save an allocation if [attrs] is empty. *)
+    match attrs with
+    | [] -> pat
+    | _ :: _ as attrs ->
+        (* See Note [Outer attributes at end] *)
+        { pat with ppat_attributes = pat.ppat_attributes @ attrs }
 end
 
 module Module_type = struct
@@ -816,8 +824,12 @@ module Module_type = struct
       match t with
       | Jmty_strengthen x -> Strengthen.mty_of ~loc x
     in
-    (* See Note [Outer attributes at end] *)
-    { mty with pmty_attributes = mty.pmty_attributes @ attrs }
+    (* Performance hack: save an allocation if [attrs] is empty. *)
+    match attrs with
+    | [] -> mty
+    | _ :: _ as attrs ->
+        (* See Note [Outer attributes at end] *)
+        { mty with pmty_attributes = mty.pmty_attributes @ attrs }
 end
 
 module Signature_item = struct

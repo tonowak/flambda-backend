@@ -81,6 +81,10 @@ module Immutable_arrays : sig
 end
 
 module N_ary_functions : sig
+
+  (** These types use the [P] prefix to match how they are represented in the
+      upstream compiler *)
+
   type function_body =
     | Pfunction_body of Parsetree.expression
     | Pfunction_cases of Parsetree.case list * Location.t * Parsetree.attributes

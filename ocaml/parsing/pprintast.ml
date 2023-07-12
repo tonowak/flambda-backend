@@ -1952,6 +1952,8 @@ and function_constraint
   (* We don't currently print [x.alloc_mode]; this would need
      to go on the enclosing [let] binding.
   *)
+  (* Enable warning 9 to ensure that the record pattern doesn't miss any field.
+  *)
   match[@ocaml.warning "+9"] x with
   | { type_constraint = Pconstraint ty; alloc_mode = _ } ->
     pp f ":@;%a" (core_type ctxt) ty

@@ -79,15 +79,14 @@ let iterator =
     match body with
     | Pfunction_cases _ -> ()
     | Pfunction_body _ ->
-        match
-          List.filter
-            (function
-              | Pparam_val _ -> true
-              | Pparam_newtype _ -> false)
-            params
-       with
-       | [] -> no_val_params loc
-       | _ :: _ -> ()
+        if
+          not (
+            List.exists
+              (function
+                | Pparam_val _ -> true
+                | Pparam_newtype _ -> false)
+              params)
+        then no_val_params loc
   in
   let jexpr _self loc (jexp : Jane_syntax.Expression.t) =
     match jexp with

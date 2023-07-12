@@ -363,6 +363,8 @@ and add_function_body bv : Jane_syntax.N_ary_functions.function_body -> _ =
 
 and add_function_constraint bv
     : Jane_syntax.N_ary_functions.function_constraint -> _ =
+  (* Enable warning 9 to ensure that the record pattern doesn't miss any field.
+  *)
   fun[@ocaml.warning "+9"] { alloc_mode = _; type_constraint } ->
     match type_constraint with
     | Pconstraint ty ->
