@@ -714,8 +714,15 @@ let class_of_let_bindings ~loc lbs body =
    parameter.
 *)
 let all_params_as_newtypes =
-  let is_newtype = function Pparam_newtype _ -> true | Pparam_val _ -> false in
-  let as_newtype = function Pparam_newtype x -> Some x | Pparam_val _ -> None in
+  let open N_ary in
+  let is_newtype = function
+    | Pparam_newtype _ -> true
+    | Pparam_val _ -> false
+  in
+  let as_newtype = function
+    | Pparam_newtype (x, loc) -> Some (x, loc)
+    | Pparam_val _ -> None
+  in
   fun params ->
     if List.for_all is_newtype params
     then Some (List.filter_map as_newtype params)
