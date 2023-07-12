@@ -351,21 +351,24 @@ module N_ary_functions = struct
   type expression =
     function_param list * function_constraint option * function_body
 
-  module Extension_node = struct
+  (** An attribute of the form [@jane.erasable._builtin.*] that's relevant
+      to n-ary functions. The "*" in the example is what we call the "suffix".
+  *)
+  module Attribute_node = struct
     type t =
       | Param
       | End_expression_body
       | End_cases
       | Alloc_mode of alloc_mode
 
-    let to_extension_suffix = function
+    let to_suffix = function
       | Param -> [ "param" ]
-      | End_expression_body -> ["end" ]
-      | End_cases -> ["end"; "cases" ]
+      | End_expression_body -> [ "end" ]
+      | End_cases -> [ "end"; "cases" ]
       | Alloc_mode Global -> [ "alloc_mode"; "global" ]
       | Alloc_mode Local -> [ "alloc_mode"; "local" ]
 
-    let of_extension_suffix = function
+    let of_suffix = function
       | [ "param" ] -> Some Param
       | [ "end" ] -> Some End_expression_body
       | [ "end"; "cases" ] -> Some End_cases
@@ -376,10 +379,10 @@ module N_ary_functions = struct
     let format ppf t =
       Embedded_name.pp_quoted_name
         ppf
-        (Embedded_name.of_feature feature (to_extension_suffix t))
+        (Embedded_name.of_feature feature (to_suffix t))
   end
 
-  module Extension_node_with_payload = struct
+  module Attribute_node_with_payload = struct
     type t =
       | Param
       | End_expression_body
@@ -410,19 +413,19 @@ module N_ary_functions = struct
              legal construct is a nested sequence of Pexp_fun and Pexp_newtype \
              nodes, optionally followed by a Pexp_coerce or Pexp_constraint \
              node, followed by a node with a %a or %a attribute."
-            Extension_node.format Extension_node.End_cases
-            Extension_node.format Extension_node.End_expression_body
+            Attribute_node.format Attribute_node.End_cases
+            Attribute_node.format Attribute_node.End_expression_body
       | Missing_alloc_mode ->
           Location.errorf ~loc
             "Expected the alloc mode to be indicated on a Pexp_coerce or \
              Pexp_constraint node within an n-ary function: one of \
              %a or %a."
-            Extension_node.format (Extension_node.Alloc_mode Global)
-            Extension_node.format (Extension_node.Alloc_mode Local)
+            Attribute_node.format (Attribute_node.Alloc_mode Global)
+            Attribute_node.format (Attribute_node.Alloc_mode Local)
       | Misannotated_function_cases ->
           Location.errorf ~loc
             "%a may be applied only to a function expression."
-            Extension_node.format Extension_node.End_cases
+            Attribute_node.format Attribute_node.End_cases
       | Bad_syntactic_arity_embedding suffix ->
           Location.errorf ~loc
             "Unknown syntactic-arity extension point %a."
@@ -440,6 +443,28 @@ module N_ary_functions = struct
     let raise expr err = raise (Error (expr.pexp_loc, err))
   end
 
+  (* The desugared-to-OCaml version of an n-ary function is described by the
+     following BNF, where [{% '...' | expr %}] refers to the result of
+     [Expression.make_jane_syntax] (via n_ary_function_expr) as described at the
+     top of [jane_syntax_parsing.mli].
+
+     {v
+         n_ary_function ::=
+           | {% '_builtin.param' | 'fun' pattern '->' n_ary_function %}
+           | n_ary_function_body
+           | {% '_builtin.alloc_mode.global' | n_ary_constraint_then_body %}
+           | {% '_builtin.alloc_mode.local'  | n_ary_constraint_then_body %}
+
+         n_ary_function_body ::=
+           | {% '_builtin.end' | expression %}
+           | {% '_builtin.end.cases' | 'function' cases %}
+
+         n_ary_constraint_then_body ::=
+           | n_ary_function_body (':' type)? ':>' type (* Pexp_coerce *)
+           | n_ary_function_body ':' type              (* Pexp_constraint *)
+     v}
+  *)
+
   let expand_n_ary_expr expr =
     match find_and_remove_jane_syntax_attribute expr.pexp_attributes with
     | None -> None
@@ -448,7 +473,7 @@ module N_ary_functions = struct
         match Jane_syntax_parsing.Embedded_name.components ext_name with
         | feature :: suffix
           when String.equal feature extension_string -> begin
-            match Extension_node.of_extension_suffix suffix with
+            match Attribute_node.of_suffix suffix with
             | Some ext -> Some (ext, expr)
             | None ->
               Desugaring_error.raise
@@ -462,7 +487,7 @@ module N_ary_functions = struct
       end
 
   let expand_n_ary_expr_with_payload expr
-      : (Extension_node_with_payload.t * Parsetree.expression) option
+      : (Attribute_node_with_payload.t * Parsetree.expression) option
     =
     match expand_n_ary_expr expr with
     | None -> None
@@ -566,7 +591,7 @@ module N_ary_functions = struct
       | _ -> None
 
   let n_ary_function_expr ext x =
-    let suffix = Extension_node.to_extension_suffix ext in
+    let suffix = Attribute_node.of_suffix ext in
     Expression.make_jane_syntax feature suffix x
 
   let expr_of ~loc (params, constraint_, body) =
