@@ -384,9 +384,8 @@ module N_ary_functions = struct
 
   module Attribute_node_with_payload = struct
     type t =
-      | Param
-      | End_expression_body
-      | End_cases of case list
+      | Param of attributes (** Unconsumed attributes *)
+      | End of function_body
       | Alloc_mode of alloc_mode
   end
 
@@ -394,6 +393,7 @@ module N_ary_functions = struct
     type error =
       | Non_syntactic_arity_embedding of Embedded_name.t
       | Missing_closing_embedding
+      | Unexpected_opening_embedding_attribute
       | Missing_alloc_mode
       | Misannotated_function_cases
       | Bad_syntactic_arity_embedding of string list
@@ -415,6 +415,13 @@ module N_ary_functions = struct
              node, followed by a node with a %a or %a attribute."
             Attribute_node.format Attribute_node.End_cases
             Attribute_node.format Attribute_node.End_expression_body
+      | Unexpected_opening_embedding_attribute ->
+          Location.errorf ~loc
+            "The first embedded node of the n-ary function was not annotated \
+             as %a or %a, which are the only legal ways to begin such an \
+             embedding."
+            Attribute_node.format Attribute_node.Param
+            Attribute_node.format Attribute_node.End_cases
       | Missing_alloc_mode ->
           Location.errorf ~loc
             "Expected the alloc mode to be indicated on a Pexp_coerce or \
@@ -469,12 +476,11 @@ module N_ary_functions = struct
     match find_and_remove_jane_syntax_attribute expr.pexp_attributes with
     | None -> None
     | Some (ext_name, attributes) -> begin
-        let expr = { expr with pexp_attributes = attributes } in
         match Jane_syntax_parsing.Embedded_name.components ext_name with
         | feature :: suffix
           when String.equal feature extension_string -> begin
             match Attribute_node.of_suffix suffix with
-            | Some ext -> Some (ext, expr)
+            | Some ext -> Some (ext, attributes)
             | None ->
               Desugaring_error.raise
                 expr
@@ -486,29 +492,28 @@ module N_ary_functions = struct
             (Non_syntactic_arity_embedding ext_name)
       end
 
-  let expand_n_ary_expr_with_payload expr
-      : (Attribute_node_with_payload.t * Parsetree.expression) option
+  let expand_n_ary_expr_with_payload expr : Attribute_node_with_payload.t option
     =
-    match expand_n_ary_expr expr with
-    | None -> None
-    | Some (Param, expr) -> Some (Param, expr)
-    | Some (End_expression_body, expr) -> Some (End_expression_body, expr)
-    | Some (End_cases, ({ pexp_desc = Pexp_function cases } as expr)) ->
-        Some (End_cases cases, expr)
-    | Some (End_cases, expr) ->
+    match expand_n_ary_expr expr, expr with
+    | None, _ -> None
+    (* There may be user-written attributes on the outermost [Param] node. We
+       want Jane Syntax to preserve those, so we return them back to the caller.
+    *)
+    | Some (Param, attributes), _ -> Some (Param attributes)
+    | Some (End_expression_body, attributes), _ ->
+        Some (End (Pfunction_body { expr with pexp_attributes = attributes }))
+    | Some (End_cases, attributes), { pexp_desc = Pexp_function cases } ->
+        Some (End (Pfunction_cases (cases, expr.pexp_loc, attributes)))
+    | Some (End_cases, _), _ ->
         Desugaring_error.raise expr Misannotated_function_cases
-    | Some (Alloc_mode alloc_mode, expr) -> Some (Alloc_mode alloc_mode, expr)
+    | Some (Alloc_mode alloc_mode, _), _ -> Some (Alloc_mode alloc_mode)
 
   let check_end expr ~rev_params ~function_constraint =
     match expand_n_ary_expr_with_payload expr with
-    | Some (Param, _) | Some (Alloc_mode _, _) -> None
-    | Some (End_cases cases, expr) ->
-        let { pexp_loc = loc; pexp_attributes = attrs } = expr in
+    | Some Param _ | Some Alloc_mode _ -> None
+    | Some (End function_body) ->
         let params = List.rev rev_params in
-        Some (params, function_constraint, Pfunction_cases (cases, loc, attrs))
-    | Some (End_expression_body, expr) ->
-        let params = List.rev rev_params in
-        Some (params, function_constraint, Pfunction_body expr)
+        Some (params, function_constraint, function_body)
     | None ->
         (* In this case, the node is not marked with any Jane Syntax attribute.
            It may seem surprising that we don't raise an error, as it would seem
@@ -570,24 +575,18 @@ module N_ary_functions = struct
       match expr.pexp_desc with
       | Pexp_function _ | Pexp_fun _ | Pexp_newtype _ -> begin
           match expand_n_ary_expr_with_payload expr with
-          | Some (End_cases cases, expr) ->
+          | Some (End (Pfunction_cases (cases, loc, attrs))) ->
               (* If the outermost node is [End_cases], we place the attributes
                  on the function node as a whole rather than on the
                  [Pfunction_cases] body.
               *)
-              let { pexp_loc = loc; pexp_attributes = attrs } = expr in
-              let n_ary =
-                [], None, Pfunction_cases (cases, loc, [])
-              in
+              let n_ary = [], None, Pfunction_cases (cases, loc, []) in
               Some (n_ary, attrs)
-          | expanded ->
-              let unconsumed_attributes =
-                match expanded with
-                | None -> expr.pexp_attributes
-                | Some (_, { pexp_attributes }) -> pexp_attributes
-              in
+          | Some (Param unconsumed_attributes) ->
               Some (loop expr ~rev_params:[], unconsumed_attributes)
-      end
+          | Some (Alloc_mode _) | Some (End (Pfunction_body _)) | None ->
+              Desugaring_error.raise expr Unexpected_opening_embedding_attribute
+        end
       | _ -> None
 
   let n_ary_function_expr ext x =
