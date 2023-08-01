@@ -353,27 +353,29 @@ module N_ary_functions = struct
 
   (** An attribute of the form [@jane.erasable._builtin.*] that's relevant
       to n-ary functions. The "*" in the example is what we call the "suffix".
+      See the below BNF for the meaning of the attributes.
   *)
   module Attribute_node = struct
+    type after_fun =
+      | Cases
+      | Constraint_then_cases
+
     type t =
-      | Param
-      | End_expression_body
-      | End_cases
-      | Alloc_mode of alloc_mode
+      | Top_level
+      | Fun_then of after_fun
+      | Local_constraint
 
     let to_suffix = function
-      | Param -> [ "param" ]
-      | End_expression_body -> [ "end" ]
-      | End_cases -> [ "end"; "cases" ]
-      | Alloc_mode Global -> [ "alloc_mode"; "global" ]
-      | Alloc_mode Local -> [ "alloc_mode"; "local" ]
+      | Top_level -> []
+      | Fun_then Cases -> [ "cases" ]
+      | Fun_then Constraint_then_cases -> [ "constraint"; "cases" ]
+      | Local_constraint -> [ "local_constraint" ]
 
     let of_suffix = function
-      | [ "param" ] -> Some Param
-      | [ "end" ] -> Some End_expression_body
-      | [ "end"; "cases" ] -> Some End_cases
-      | [ "alloc_mode"; "global" ] -> Some (Alloc_mode Global)
-      | [ "alloc_mode"; "local" ] -> Some (Alloc_mode Local)
+      | [] -> Some Top_level
+      | [ "cases" ] -> Some (Fun_then Cases)
+      | [ "constraint"; "cases" ] -> Some (Fun_then Constraint_then_cases)
+      | [ "local_constraint" ] -> Some Local_constraint
       | _ -> None
 
     let format ppf t =
@@ -382,62 +384,36 @@ module N_ary_functions = struct
         (Embedded_name.of_feature feature (to_suffix t))
   end
 
-  module Attribute_node_with_payload = struct
-    type t =
-      | Param of attributes (** Unconsumed attributes *)
-      | End of function_body
-      | Alloc_mode of alloc_mode
-  end
-
   module Desugaring_error = struct
     type error =
-      | Non_syntactic_arity_embedding of Embedded_name.t
-      | Missing_closing_embedding
-      | Unexpected_opening_embedding_attribute
-      | Missing_alloc_mode
-      | Misannotated_function_cases
       | Bad_syntactic_arity_embedding of string list
+      | Expected_constraint_or_coerce
+      | Expected_function_cases of Attribute_node.t
+      | Expected_fun_or_newtype of Attribute_node.t
+      | Parameterless_function
 
     let report_error ~loc = function
-      | Non_syntactic_arity_embedding name ->
-          Location.errorf ~loc
-            "Tried to desugar the non-syntactic-arity embedded term \
-             %a as part of a syntactic-arity expression. The \
-             embedding should start with %a."
-            Embedded_name.pp_quoted_name name
-            Embedded_name.pp_quoted_name (Embedded_name.of_feature feature [])
-      | Missing_closing_embedding ->
-          Location.errorf ~loc
-            "Expected a syntactic-arity embedding delimiting the end of \
-             the n-ary function before reaching a node of this kind. The only \
-             legal construct is a nested sequence of Pexp_fun and Pexp_newtype \
-             nodes, optionally followed by a Pexp_coerce or Pexp_constraint \
-             node, followed by a node with a %a or %a attribute."
-            Attribute_node.format Attribute_node.End_cases
-            Attribute_node.format Attribute_node.End_expression_body
-      | Unexpected_opening_embedding_attribute ->
-          Location.errorf ~loc
-            "The first embedded node of the n-ary function was not annotated \
-             as %a or %a, which are the only legal ways to begin such an \
-             embedding."
-            Attribute_node.format Attribute_node.Param
-            Attribute_node.format Attribute_node.End_cases
-      | Missing_alloc_mode ->
-          Location.errorf ~loc
-            "Expected the alloc mode to be indicated on a Pexp_coerce or \
-             Pexp_constraint node within an n-ary function: one of \
-             %a or %a."
-            Attribute_node.format (Attribute_node.Alloc_mode Global)
-            Attribute_node.format (Attribute_node.Alloc_mode Local)
-      | Misannotated_function_cases ->
-          Location.errorf ~loc
-            "%a may be applied only to a function expression."
-            Attribute_node.format Attribute_node.End_cases
       | Bad_syntactic_arity_embedding suffix ->
           Location.errorf ~loc
             "Unknown syntactic-arity extension point %a."
             Embedded_name.pp_quoted_name
             (Embedded_name.of_feature feature suffix)
+      | Expected_constraint_or_coerce ->
+          Location.errorf ~loc
+            "Expected a Pexp_constraint or Pexp_coerce node at this position."
+      | Expected_function_cases attribute ->
+          Location.errorf ~loc
+            "Expected a Pexp_function node in this position, as the enclosing \
+             Pexp_fun is annotated with %a."
+            Attribute_node.format attribute
+      | Expected_fun_or_newtype attribute ->
+          Location.errorf ~loc
+            "Only Pexp_fun or Pexp_newtype may carry the attribute %a."
+            Attribute_node.format attribute
+      | Parameterless_function ->
+          Location.errorf ~loc
+            "The expression is a Jane Syntax encoding of a function with no \
+             parameters, which is an invalid expression."
 
     exception Error of Location.t * error
 
@@ -447,28 +423,61 @@ module N_ary_functions = struct
           | Error(loc, err) -> Some (report_error ~loc err)
           | _ -> None)
 
+    let raise_with_loc loc err = raise (Error (loc, err))
     let raise expr err = raise (Error (expr.pexp_loc, err))
   end
 
   (* The desugared-to-OCaml version of an n-ary function is described by the
      following BNF, where [{% '...' | expr %}] refers to the result of
      [Expression.make_jane_syntax] (via n_ary_function_expr) as described at the
-     top of [jane_syntax_parsing.mli].
+     top of [jane_syntax_parsing.mli]. Within the '...' string, I use <...>
+     brackets to denote string interpolation.
 
      {v
+         (* The entry point.
+
+            The encoding only puts attributes on:
+              - [fun] nodes
+              - constraint/coercion nodes, on the rare occasions
+                that a constraint should be interpreted at the [local] mode
+
+            This ensures that we rarely put attributes on the *body* of the
+            function, which means that ppxes that move or transform the body
+            of a function won't make Jane Syntax complain.
+         *)
          n_ary_function ::=
-           | {% '_builtin.param' | 'fun' pattern '->' n_ary_function %}
-           | n_ary_function_body
-           | {% '_builtin.alloc_mode.global' | n_ary_constraint_then_body %}
-           | {% '_builtin.alloc_mode.local'  | n_ary_constraint_then_body %}
+           | nested_n_ary_function
+           (* A function need not have [fun] params; it can be a function
+              or a constrained function. These need not have extra attributes,
+              except in the rare case that the function is constrained at the
+              local mode.
+           *)
+           | pexp_function
+           | constraint_with_mode_then(pexp_function)
 
-         n_ary_function_body ::=
-           | {% '_builtin.end' | expression %}
-           | {% '_builtin.end.cases' | 'function' cases %}
+         nested_n_ary_function ::=
+           | fun_then(nested_n_ary_function)
+           | fun_then(constraint_with_mode_then(expression))
+           | {% '_builtin.cases' | fun_then(pexp_function) }
+           | {% '_builtin.constraint.cases' |
+               fun_then(constraint_with_mode_then(pexp_function)) }
+           | fun_then(expression)
 
-         n_ary_constraint_then_body ::=
-           | n_ary_function_body (':' type)? ':>' type (* Pexp_coerce *)
-           | n_ary_function_body ':' type              (* Pexp_constraint *)
+
+         fun_then(body) ::=
+           | 'fun' pattern '->' body (* Pexp_fun *)
+           | 'fun' '(' 'type' ident ')' '->' body (* Pexp_newtype *)
+
+         pexp_function ::=
+           | 'function' cases
+
+         constraint_then(ast) ::=
+           | ast (':' type)? ':>' type (* Pexp_coerce *)
+           | ast ':' type              (* Pexp_constraint *)
+
+         constraint_with_mode_then(ast) ::=
+           | constraint_then(ast)
+           | {% '_builtin.local_constraint' | constraint_then(ast) %}
      v}
   *)
 
@@ -486,143 +495,218 @@ module N_ary_functions = struct
                 expr
                 (Bad_syntactic_arity_embedding suffix)
           end
-        | _ :: _ ->
-          Desugaring_error.raise
-            expr
-            (Non_syntactic_arity_embedding ext_name)
+        | _ :: _ -> None
       end
 
-  let expand_n_ary_expr_with_payload expr : Attribute_node_with_payload.t option
-    =
-    match expand_n_ary_expr expr, expr with
-    | None, _ -> None
-    (* There may be user-written attributes on the outermost [Param] node. We
-       want Jane Syntax to preserve those, so we return them back to the caller.
-    *)
-    | Some (Param, attributes), _ -> Some (Param attributes)
-    | Some (End_expression_body, attributes), _ ->
-        Some (End (Pfunction_body { expr with pexp_attributes = attributes }))
-    | Some (End_cases, attributes), { pexp_desc = Pexp_function cases } ->
-        Some (End (Pfunction_cases (cases, expr.pexp_loc, attributes)))
-    | Some (End_cases, _), _ ->
-        Desugaring_error.raise expr Misannotated_function_cases
-    | Some (Alloc_mode alloc_mode, _), _ -> Some (Alloc_mode alloc_mode)
+  let require_function_cases expr ~arity_attribute =
+    match expr.pexp_desc with
+    | Pexp_function cases -> cases
+    | _ -> Desugaring_error.raise expr (Expected_function_cases arity_attribute)
 
-  let check_end expr ~rev_params ~function_constraint =
-    match expand_n_ary_expr_with_payload expr with
-    | Some Param _ | Some Alloc_mode _ -> None
-    | Some (End function_body) ->
-        let params = List.rev rev_params in
-        Some (params, function_constraint, function_body)
-    | None ->
-        (* In this case, the node is not marked with any Jane Syntax attribute.
-           It may seem surprising that we don't raise an error, as it would seem
-           the AST is invalid by the invariants of the Jane Syntax library.
-           We don't raise an error because we permit ppxes to drop the final
-           [End_expression_body] attribute. Lots of existing ppxes do this in
-           the course of rewriting functions, and it's difficult to change them
-           all to not drop this attribute. Instead, we consider the absence of
-           any Jane Syntax attribute to be equivalent to [End_expression_body].
-
-           Note we'll still loudly complain if we see a *misplaced* Jane Syntax
-           attribute.
-        *)
-        let params = List.rev rev_params in
-        Some (params, function_constraint, Pfunction_body expr)
-
-  let require_alloc_mode expr =
+  let constraint_alloc_mode expr : alloc_mode =
     match expand_n_ary_expr expr with
-    | Some (Alloc_mode alloc_mode, _) -> alloc_mode
-    | _ -> Desugaring_error.raise expr Missing_alloc_mode
+    | Some (Local_constraint, _) -> Local
+    | _ -> Global
 
-  let require_end expr ~rev_params ~type_constraint ~alloc_mode =
-    match
-      check_end
-        expr
-        ~rev_params
-        ~function_constraint:(Some { type_constraint; alloc_mode })
-    with
-    | Some result -> result
+  let check_constraint expr =
+    match expr.pexp_desc with
+    | Pexp_constraint (e, ty) ->
+        let alloc_mode = constraint_alloc_mode expr in
+        Some ({ alloc_mode; type_constraint = Pconstraint ty }, e)
+    | Pexp_coerce (e, ty1, ty2) ->
+        let alloc_mode = constraint_alloc_mode expr in
+        Some ({ alloc_mode; type_constraint = Pcoerce (ty1, ty2) }, e)
+    | _ -> None
+
+  let require_constraint expr =
+    match check_constraint expr with
+    | Some constraint_ -> constraint_
+    | None -> Desugaring_error.raise expr Expected_constraint_or_coerce
+
+  let check_param pexp_desc =
+    match pexp_desc with
+    | Pexp_fun (lbl, def, pat, body) ->
+        Some (Pparam_val (lbl, def, pat), body)
+    | Pexp_newtype (newtype, body) ->
+        let loc = { newtype.loc with loc_ghost = true } in
+        Some (Pparam_newtype (newtype, loc), body)
+    | _ -> None
+
+  let require_param pexp_desc pexp_loc ~arity_attribute =
+    match check_param pexp_desc with
+    | Some x -> x
     | None ->
-        Desugaring_error.raise expr Missing_closing_embedding
+        Desugaring_error.raise_with_loc pexp_loc
+          (Expected_fun_or_newtype arity_attribute)
+
+  (* Should only be called on [Pexp_fun] and [Pexp_newtype]. *)
+  let extract_fun_params =
+    let open struct
+      type continue_or_stop =
+        | Continue of Parsetree.expression
+        | Stop of function_constraint option * function_body
+    end
+    in
+    let extract_next_fun_param expr
+        (* The attributes are the remaining unconsumed attributes on the
+          Pexp_fun or Pexp_newtype node.
+        *)
+        : (function_param * attributes) option * continue_or_stop
+      =
+      match expand_n_ary_expr expr with
+      | None -> begin
+          match check_param expr.pexp_desc with
+          | Some (param, body) ->
+              Some (param, expr.pexp_attributes), Continue body
+          | None ->
+              None, Stop (None, Pfunction_body expr)
+        end
+      | Some (arity_attribute, unconsumed_attributes) -> begin
+          match arity_attribute with
+          | Top_level -> None, Stop (None, Pfunction_body expr)
+          | Local_constraint ->
+              (* We need not pass through any unconsumed attributes, as
+                 [Local_constraint] isn't the outermost Jane Syntax node:
+                 [extract_fun_params] took in [Pexp_fun] or [Pexp_newtype].
+              *)
+              let function_constraint, body = require_constraint expr in
+              None, Stop (Some function_constraint, Pfunction_body body)
+          | Fun_then after_fun ->
+              let param, body =
+                require_param expr.pexp_desc expr.pexp_loc ~arity_attribute
+              in
+              let continue_or_stop =
+                match after_fun with
+                | Cases ->
+                    let cases = require_function_cases body ~arity_attribute in
+                    let function_body =
+                      Pfunction_cases
+                        (cases, body.pexp_loc, body.pexp_attributes)
+                    in
+                    Stop (None, function_body)
+                | Constraint_then_cases ->
+                    let function_constraint, body = require_constraint body in
+                    let cases = require_function_cases body ~arity_attribute in
+                    let function_body =
+                      Pfunction_cases
+                        (cases, body.pexp_loc, body.pexp_attributes)
+                    in
+                    Stop (Some function_constraint, function_body)
+              in
+              Some (param, unconsumed_attributes), continue_or_stop
+          end
+    in
+    let rec loop expr ~rev_params =
+      let next_param, continue_or_stop = extract_next_fun_param expr in
+      let rev_params =
+        match next_param with
+        | None -> rev_params
+        | Some (x, _) -> x :: rev_params
+      in
+      match continue_or_stop with
+      | Continue body -> loop body ~rev_params
+      | Stop (function_constraint, body) ->
+          let params = List.rev rev_params in
+          params, function_constraint, body
+    in
+    fun expr ->
+      begin match expr.pexp_desc with
+        | Pexp_newtype _ | Pexp_fun _ -> ()
+        | _ ->
+            Misc.fatal_error "called on something that isn't a newtype or fun"
+      end;
+      let unconsumed_attributes =
+        match extract_next_fun_param expr with
+        | Some (_, attributes), _ -> attributes
+        | None, _ -> Desugaring_error.raise expr Parameterless_function
+      in
+      loop expr ~rev_params:[], unconsumed_attributes
 
   (* Returns remaining unconsumed attributes on outermost expression *)
   let of_expr =
-    let rec loop expr ~rev_params =
-      match check_end expr ~function_constraint:None ~rev_params with
-      | Some result -> result
-      | None -> begin
-          match expr.pexp_desc with
-          | Pexp_fun (label, default, pat, body) ->
-              let param = Pparam_val (label, default, pat) in
-              loop body ~rev_params:(param :: rev_params)
-          | Pexp_newtype (newtype, body) ->
-              let loc = { newtype.loc with loc_ghost = true } in
-              let param = Pparam_newtype (newtype, loc) in
-              loop body ~rev_params:(param :: rev_params)
-          | Pexp_constraint (body, ty) ->
-              let alloc_mode = require_alloc_mode expr in
-              let type_constraint = Pconstraint ty in
-              require_end body ~rev_params ~alloc_mode ~type_constraint
-          | Pexp_coerce (body, ty1, ty2) ->
-              let alloc_mode = require_alloc_mode expr in
-              let type_constraint = Pcoerce (ty1, ty2) in
-              require_end body ~rev_params ~alloc_mode ~type_constraint
-          | _ -> Desugaring_error.raise expr Missing_closing_embedding
-        end
+    let function_without_additional_params cases constraint_ loc : expression =
+      (* If the outermost node is function cases, we place the
+          attributes on the function node as a whole rather than on the
+          [Pfunction_cases] body.
+      *)
+      [], constraint_, Pfunction_cases (cases, loc, [])
     in
     fun expr ->
       match expr.pexp_desc with
-      | Pexp_function _ | Pexp_fun _ | Pexp_newtype _ -> begin
-          match expand_n_ary_expr_with_payload expr with
-          | Some (End (Pfunction_cases (cases, loc, attrs))) ->
-              (* If the outermost node is [End_cases], we place the attributes
-                 on the function node as a whole rather than on the
-                 [Pfunction_cases] body.
-              *)
-              let n_ary = [], None, Pfunction_cases (cases, loc, []) in
-              Some (n_ary, attrs)
-          | Some (Param unconsumed_attributes) ->
-              Some (loop expr ~rev_params:[], unconsumed_attributes)
-          | Some (Alloc_mode _) | Some (End (Pfunction_body _)) | None ->
-              Desugaring_error.raise expr Unexpected_opening_embedding_attribute
+      | Pexp_fun _ | Pexp_newtype _ -> Some (extract_fun_params expr)
+      | Pexp_function cases ->
+          let n_ary =
+            function_without_additional_params cases None expr.pexp_loc
+          in
+          Some (n_ary, expr.pexp_attributes)
+      | _ -> begin
+          match check_constraint expr with
+          | Some (constraint_, { pexp_desc = Pexp_function cases }) ->
+              let n_ary =
+                function_without_additional_params cases (Some constraint_)
+                  expr.pexp_loc
+              in
+              Some (n_ary, expr.pexp_attributes)
+          | _ -> None
         end
-      | _ -> None
 
   let n_ary_function_expr ext x =
     let suffix = Attribute_node.to_suffix ext in
     Expression.make_jane_syntax feature suffix x
 
-  let expr_of ~loc (params, constraint_, body) =
-    (* See Note [Wrapping with make_entire_jane_syntax] *)
-    Expression.make_entire_jane_syntax ~loc feature (fun () ->
-      let body =
-        match body with
-        | Pfunction_body body ->
-            n_ary_function_expr End_expression_body body
-        | Pfunction_cases (cases, loc, attrs) ->
-            n_ary_function_expr End_cases
-              (Ast_helper.Exp.function_ cases ~loc ~attrs)
+  let expr_of =
+    let add_param ?after_fun_attribute param body =
+      let fun_ =
+        match param with
+        | Pparam_val (label, default, pat) ->
+            Ast_helper.Exp.fun_ label default pat body
+        | Pparam_newtype (newtype, loc) ->
+            let loc = Location.ghostify loc in
+            Ast_helper.Exp.newtype newtype body ~loc
       in
-      let constrained_body =
-        match constraint_ with
-        | None -> body
-        | Some { type_constraint; alloc_mode } ->
-            n_ary_function_expr (Alloc_mode alloc_mode)
-              (match type_constraint with
-              | Pconstraint ty -> Ast_helper.Exp.constraint_ body ty
-              | Pcoerce (ty1, ty2) -> Ast_helper.Exp.coerce body ty1 ty2)
-      in
-      List.fold_right
-        (fun param body ->
-          n_ary_function_expr Param (
-            match param with
-            | Pparam_val (label, default, pat) ->
-                Ast_helper.Exp.fun_ label default pat body
-            | Pparam_newtype (newtype, loc) ->
-                Ast_helper.Exp.newtype newtype body ~loc))
-        params
-        constrained_body)
+      match after_fun_attribute with
+      | None -> fun_
+      | Some after_fun -> n_ary_function_expr (Fun_then after_fun) fun_
+    in
+    fun ~loc (params, constraint_, function_body) ->
+      (* See Note [Wrapping with make_entire_jane_syntax] *)
+      Expression.make_entire_jane_syntax ~loc feature (fun () ->
+        let body =
+          match function_body with
+          | Pfunction_body body -> body
+          | Pfunction_cases (cases, loc, attrs) ->
+              Ast_helper.Exp.function_ cases ~loc ~attrs
+        in
+        let possibly_constrained_body =
+          match constraint_ with
+          | None -> body
+          | Some { alloc_mode; type_constraint } ->
+              let constrained_body =
+                let loc = Location.ghostify body.pexp_loc in
+                match type_constraint with
+                | Pconstraint ty -> Ast_helper.Exp.constraint_ body ty ~loc
+                | Pcoerce (ty1, ty2) -> Ast_helper.Exp.coerce body ty1 ty2 ~loc
+              in
+              match alloc_mode with
+              | Local -> n_ary_function_expr Local_constraint constrained_body
+              | Global -> constrained_body
+        in
+        match params with
+        | [] -> possibly_constrained_body
+        | params ->
+            let init_params, last_param = Misc.split_last params in
+            let after_fun_attribute : Attribute_node.after_fun option =
+              match constraint_, function_body with
+              | Some _, Pfunction_cases _ -> Some Constraint_then_cases
+              | None, Pfunction_cases _ -> Some Cases
+              | Some _, Pfunction_body _ -> None
+              | None, Pfunction_body _ -> None
+            in
+            let body_with_last_param =
+              add_param last_param ?after_fun_attribute
+                possibly_constrained_body
+            in
+            List.fold_right add_param init_params body_with_last_param)
 end
 
 (** [include functor] *)
