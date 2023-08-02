@@ -631,7 +631,19 @@ module N_ary_functions = struct
       *)
       [], constraint_, Pfunction_cases (cases, loc, [])
     in
+    (* Hack: be more permissive toward a way that a ppx can mishandle an
+       attribute, which is to duplicate the top-level Jane Syntax
+       attribute.
+    *)
+    let rec remove_top_level_attributes expr =
+      match expand_n_ary_expr expr with
+      | Some (Top_level, unconsumed_attributes) ->
+          remove_top_level_attributes
+            { expr with pexp_attributes = unconsumed_attributes }
+      | _ -> expr
+    in
     fun expr ->
+      let expr = remove_top_level_attributes expr in
       match expr.pexp_desc with
       | Pexp_fun _ | Pexp_newtype _ -> Some (extract_fun_params expr)
       | Pexp_function cases ->
