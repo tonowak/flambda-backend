@@ -132,12 +132,14 @@ let preserve_tailcall_for_prim = function
   | Pcvtbint _ | Pnegbint _ | Paddbint _ | Psubbint _ | Pmulbint _ | Pdivbint _
   | Pmodbint _ | Pandbint _ | Porbint _ | Pxorbint _ | Plslbint _ | Plsrbint _
   | Pasrbint _ | Pbintcomp _ | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
-  | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_64 _ | Pbytes_load_16 _
-  | Pbytes_load_32 _ | Pbytes_load_64 _ | Pbytes_set_16 _ | Pbytes_set_32 _
-  | Pbytes_set_64 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
-  | Pbigstring_load_64 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_64 _ | Pstring_load_128 _
+  | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_64 _ | Pbytes_load_128 _
+  | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_64 _ | Pbytes_set_128 _
+  | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_64 _
+  | Pbigstring_load_128 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_set_64 _ | Pbigstring_set_128 _
   | Pprobe_is_enabled _ | Pobj_dup
-  | Pbigstring_set_64 _ | Pctconst _ | Pbswap16 | Pbbswap _ | Pint_as_pointer ->
+  | Pctconst _ | Pbswap16 | Pbbswap _ | Pint_as_pointer ->
       false
 
 (* Add a Kpop N instruction in front of a continuation *)
@@ -447,12 +449,18 @@ let comp_primitive p args =
   | Pstring_load_16(_) -> Kccall("caml_string_get16", 2)
   | Pstring_load_32(_) -> Kccall("caml_string_get32", 2)
   | Pstring_load_64(_) -> Kccall("caml_string_get64", 2)
+  | Pstring_load_128{aligned = false; _} -> Kccall("caml_string_getu128", 2)
+  | Pstring_load_128{aligned = true; _} -> Kccall("caml_string_geta128", 2)
   | Pbytes_set_16(_) -> Kccall("caml_bytes_set16", 3)
   | Pbytes_set_32(_) -> Kccall("caml_bytes_set32", 3)
   | Pbytes_set_64(_) -> Kccall("caml_bytes_set64", 3)
+  | Pbytes_set_128{aligned = false; _} -> Kccall("caml_bytes_setu128", 2)
+  | Pbytes_set_128{aligned = true; _} -> Kccall("caml_bytes_seta128", 2)
   | Pbytes_load_16(_) -> Kccall("caml_bytes_get16", 2)
   | Pbytes_load_32(_) -> Kccall("caml_bytes_get32", 2)
   | Pbytes_load_64(_) -> Kccall("caml_bytes_get64", 2)
+  | Pbytes_load_128{aligned = false; _} -> Kccall("caml_bytes_getu128", 2)
+  | Pbytes_load_128{aligned = true; _} -> Kccall("caml_bytes_geta128", 2)
   | Parraylength _ -> Kvectlength
   (* In bytecode, nothing is ever actually stack-allocated, so we ignore the
      array modes (allocation for [Parrayref{s,u}], modification for
@@ -521,9 +529,13 @@ let comp_primitive p args =
   | Pbigstring_load_16(_) -> Kccall("caml_ba_uint8_get16", 2)
   | Pbigstring_load_32(_) -> Kccall("caml_ba_uint8_get32", 2)
   | Pbigstring_load_64(_) -> Kccall("caml_ba_uint8_get64", 2)
+  | Pbigstring_load_128{aligned = false; _} -> Kccall("caml_ba_unit8_getu128", 2)
+  | Pbigstring_load_128{aligned = true; _} -> Kccall("caml_ba_unit8_geta128", 2)
   | Pbigstring_set_16(_) -> Kccall("caml_ba_uint8_set16", 3)
   | Pbigstring_set_32(_) -> Kccall("caml_ba_uint8_set32", 3)
   | Pbigstring_set_64(_) -> Kccall("caml_ba_uint8_set64", 3)
+  | Pbigstring_set_128{aligned = false; _} -> Kccall("caml_ba_unit8_setu128", 2)
+  | Pbigstring_set_128{aligned = true; _} -> Kccall("caml_ba_unit8_seta128", 2)
   | Pbswap16 -> Kccall("caml_bswap16", 1)
   | Pbbswap(bi,_) -> comp_bint_primitive bi "bswap" args
   | Pint_as_pointer -> Kccall("caml_int_as_pointer", 1)

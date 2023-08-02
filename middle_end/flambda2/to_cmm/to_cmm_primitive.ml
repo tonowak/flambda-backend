@@ -50,7 +50,7 @@ let value_slot_offset env value_slot =
 let unbox_number ~dbg kind arg =
   match (kind : K.Boxable_number.t) with
   | Naked_float -> C.unbox_float dbg arg
-  | Naked_vec128 -> C.unbox_vec128 dbg arg
+  | Naked_vec128 -> C.unbox_vec128 dbg arg ~aligned:false
   | Naked_int32 | Naked_int64 | Naked_nativeint ->
     let primitive_kind = K.Boxable_number.primitive_kind kind in
     C.unbox_int dbg primitive_kind arg
@@ -179,6 +179,8 @@ let string_like_load_aux ~dbg width ~str ~index =
   | Sixteen -> C.unaligned_load_16 str index dbg
   | Thirty_two -> C.sign_extend_32 dbg (C.unaligned_load_32 str index dbg)
   | Sixty_four -> C.unaligned_load_64 str index dbg
+  | One_twenty_eight { aligned = true } -> C.aligned_load_128 str index dbg
+  | One_twenty_eight { aligned = false } -> C.unaligned_load_128 str index dbg
 
 let string_like_load ~dbg kind width ~str ~index =
   match (kind : P.string_like_value) with
@@ -198,6 +200,10 @@ let bytes_or_bigstring_set_aux ~dbg width ~bytes ~index ~new_value =
   | Sixteen -> C.unaligned_set_16 bytes index new_value dbg
   | Thirty_two -> C.unaligned_set_32 bytes index new_value dbg
   | Sixty_four -> C.unaligned_set_64 bytes index new_value dbg
+  | One_twenty_eight { aligned = false } ->
+    C.unaligned_set_128 bytes index new_value dbg
+  | One_twenty_eight { aligned = true } ->
+    C.aligned_set_128 bytes index new_value dbg
 
 let bytes_or_bigstring_set ~dbg kind width ~bytes ~index ~new_value =
   let expr =

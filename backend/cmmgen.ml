@@ -163,7 +163,7 @@ let get_field env layout ptr n dbg =
     | Pvalue Pintval | Punboxed_int _ -> Word_int
     | Pvalue _ -> Word_val
     | Punboxed_float -> Double
-    | Punboxed_vector (Pvec128 _) -> Onetwentyeight
+    | Punboxed_vector (Pvec128 _) -> Onetwentyeight_unaligned
     | Ptop ->
         Misc.fatal_errorf "get_field with Ptop: %a" Debuginfo.print_compact dbg
     | Pbottom ->
@@ -356,7 +356,7 @@ let unbox_number dbg bn arg =
   | Boxed_integer (bi, _, _) ->
     unbox_int dbg bi arg
   | Boxed_vector (Pvec128 _, _, _) ->
-    unbox_vec128 dbg arg
+    unbox_vec128 dbg arg ~aligned:false
 
 (* Auxiliary functions for optimizing "let" of boxed numbers (floats and
    boxed integers *)
@@ -933,7 +933,7 @@ and transl_ccall env prim args dbg =
           | Pint64 -> XInt64 in
         (xty, transl_unbox_int dbg env bi arg)
     | Unboxed_vector (Pvec128 _) ->
-        (XVec128, transl_unbox_vec128 dbg env arg)
+        (XVec128, transl_unbox_vec128 dbg env arg ~aligned:false)
     | Untagged_int ->
         (XInt, untag_int (transl env arg) dbg)
   in
@@ -1303,8 +1303,8 @@ and transl_unbox_float dbg env exp =
 and transl_unbox_int dbg env bi exp =
   unbox_int dbg bi (transl env exp)
 
-and transl_unbox_vec128 dbg env exp =
-  unbox_vec128 dbg (transl env exp)
+and transl_unbox_vec128 dbg env exp ~aligned =
+  unbox_vec128 dbg (transl env exp) ~aligned
 
 (* transl_unbox_int, but may return garbage in upper bits *)
 and transl_unbox_int_low dbg env bi e =
@@ -1317,6 +1317,7 @@ and transl_unbox_sized size dbg env exp =
      ignore_high_bit_int (untag_int (transl env exp) dbg)
   | Thirty_two -> transl_unbox_int dbg env Pint32 exp
   | Sixty_four -> transl_unbox_int dbg env Pint64 exp
+  | One_twenty_eight {aligned} -> transl_unbox_vec128 dbg env exp ~aligned
 
 and transl_let_value env str (kind : Lambda.value_kind) id exp transl_body =
   let dbg = Debuginfo.none in

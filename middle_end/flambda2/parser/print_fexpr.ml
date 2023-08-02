@@ -448,7 +448,9 @@ let string_accessor_width ppf saw =
     | Eight -> "8"
     | Sixteen -> "16"
     | Thirty_two -> "32"
-    | Sixty_four -> "64")
+    | Sixty_four -> "64"
+    | One_twenty_eight { aligned = false } -> "u128"
+    | One_twenty_eight { aligned = true } -> "a128")
 
 let binop ppf binop a b =
   match binop with

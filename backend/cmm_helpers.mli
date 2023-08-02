@@ -213,7 +213,7 @@ val unbox_float : Debuginfo.t -> expression -> expression
 (** Vector boxing and unboxing *)
 val box_vec128 : Debuginfo.t -> Lambda.alloc_mode -> expression -> expression
 
-val unbox_vec128 : Debuginfo.t -> expression -> expression
+val unbox_vec128 : Debuginfo.t -> aligned:bool -> expression -> expression
 
 (** Complex number creation and access *)
 val box_complex : Debuginfo.t -> expression -> expression -> expression
@@ -478,6 +478,7 @@ val check_bound :
   expression ->
   expression ->
   expression ->
+  expression ->
   expression
 
 (** Sys.opaque_identity *)
@@ -601,6 +602,16 @@ val unaligned_set_32 :
 val unaligned_load_64 : expression -> expression -> Debuginfo.t -> expression
 
 val unaligned_set_64 :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_load_128 : expression -> expression -> Debuginfo.t -> expression
+
+val unaligned_set_128 :
+  expression -> expression -> expression -> Debuginfo.t -> expression
+
+val aligned_load_128 : expression -> expression -> Debuginfo.t -> expression
+
+val aligned_set_128 :
   expression -> expression -> expression -> Debuginfo.t -> expression
 
 (** Raw memory accesses *)
