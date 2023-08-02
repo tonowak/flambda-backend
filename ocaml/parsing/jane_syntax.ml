@@ -659,7 +659,8 @@ module N_ary_functions = struct
       let fun_ =
         match param with
         | Pparam_val (label, default, pat) ->
-            Ast_helper.Exp.fun_ label default pat body
+            (Ast_helper.Exp.fun_ label default pat body
+              [@alert "-prefer_jane_syntax"])
         | Pparam_newtype (newtype, loc) ->
             let loc = Location.ghostify loc in
             Ast_helper.Exp.newtype newtype body ~loc
@@ -675,7 +676,8 @@ module N_ary_functions = struct
           match function_body with
           | Pfunction_body body -> body
           | Pfunction_cases (cases, loc, attrs) ->
-              Ast_helper.Exp.function_ cases ~loc ~attrs
+              (Ast_helper.Exp.function_ cases ~loc ~attrs
+                 [@alert "-prefer_jane_syntax"])
         in
         let possibly_constrained_body =
           match constraint_ with

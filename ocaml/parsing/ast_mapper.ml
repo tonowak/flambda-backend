@@ -583,9 +583,11 @@ module E = struct
         let_ ~loc ~attrs r (List.map (sub.value_binding sub) vbs)
           (sub.expr sub e)
     | Pexp_fun (lab, def, p, e) ->
-        fun_ ~loc ~attrs lab (map_opt (sub.expr sub) def) (sub.pat sub p)
-          (sub.expr sub e)
-    | Pexp_function pel -> function_ ~loc ~attrs (sub.cases sub pel)
+        (fun_ ~loc ~attrs lab (map_opt (sub.expr sub) def) (sub.pat sub p)
+          (sub.expr sub e) [@alert "-prefer_jane_syntax"])
+    | Pexp_function pel ->
+        (function_ ~loc ~attrs (sub.cases sub pel)
+           [@alert "-prefer_jane_syntax"])
     | Pexp_apply (e, l) ->
         apply ~loc ~attrs (sub.expr sub e) (List.map (map_snd (sub.expr sub)) l)
     | Pexp_match (e, pel) ->
@@ -735,10 +737,10 @@ module CE = struct
     | Pcl_structure s ->
         structure ~loc ~attrs (sub.class_structure sub s)
     | Pcl_fun (lab, e, p, ce) ->
-        fun_ ~loc ~attrs lab
+        (fun_ ~loc ~attrs lab
           (map_opt (sub.expr sub) e)
           (sub.pat sub p)
-          (sub.class_expr sub ce)
+          (sub.class_expr sub ce) [@alert "-prefer_jane_syntax"])
     | Pcl_apply (ce, l) ->
         apply ~loc ~attrs (sub.class_expr sub ce)
           (List.map (map_snd (sub.expr sub)) l)

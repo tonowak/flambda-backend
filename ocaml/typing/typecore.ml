@@ -7526,7 +7526,8 @@ and type_n_ary_function
     let fun_body =
       match body with
       | Pfunction_body body -> body
-      | Pfunction_cases (cases, loc, attrs) -> Exp.function_ cases ~attrs ~loc
+      | Pfunction_cases (cases, loc, attrs) ->
+          (Exp.function_ cases ~attrs ~loc [@alert "-prefer_jane_syntax"])
     in
     let constrained_body =
       let loc = { fun_body.pexp_loc with loc_ghost = true } in
@@ -7558,7 +7559,7 @@ and type_n_ary_function
            match param with
            | Pparam_val (l, o, p) ->
                let loc = { loc with loc_start = p.ppat_loc.loc_start } in
-               Exp.fun_ l o p body ~loc
+               (Exp.fun_ l o p body ~loc [@alert "-prefer_jane_syntax"])
            | Pparam_newtype (newtype, newtype_loc) ->
                let loc = { loc with loc_start = newtype_loc.loc_start } in
                Exp.newtype newtype body ~loc)
