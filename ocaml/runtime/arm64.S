@@ -527,15 +527,6 @@ FUNCTION(caml_ml_array_bound_error)
         CFI_ENDPROC
         END_FUNCTION(caml_ml_array_bound_error)
 
-FUNCTION(caml_ml_array_align_error)
-        CFI_STARTPROC
-    /* Load address of [caml_array_align_error] in ADDITIONAL_ARG */
-        ADDRGLOBAL(ADDITIONAL_ARG, caml_array_align_error)
-    /* Call that function */
-        b       G(caml_c_call)
-        CFI_ENDPROC
-        END_FUNCTION(caml_ml_array_align_error)
-
          TEXT_SECTION(caml_system__code_end)
         .globl  G(caml_system__code_end)
 G(caml_system__code_end):

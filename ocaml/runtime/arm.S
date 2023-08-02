@@ -425,15 +425,6 @@ FUNCTION(caml_ml_array_bound_error)
         CFI_ENDPROC
         .size   caml_ml_array_bound_error, .-caml_ml_array_bound_error
 
-FUNCTION(caml_ml_array_align_error)
-        CFI_STARTPROC
-    /* Load address of [caml_array_align_error] in r7 */
-        ldr     r7, =caml_array_align_error
-    /* Call that function */
-        b       caml_c_call
-        CFI_ENDPROC
-        .size   caml_ml_array_align_error, .-caml_ml_array_align_error
-
         TEXT_SECTION(caml_system__code_end)
         .globl  caml_system__code_end
 caml_system__code_end:

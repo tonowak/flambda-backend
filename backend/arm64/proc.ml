@@ -416,6 +416,7 @@ let operation_supported = function
   | Cclz _ | Cctz _ | Cpopcnt
   | Cprefetch _ | Catomic _
   | Cvectorcast _ | Cscalarcast _
+  | Ccheckalign _
     -> false   (* Not implemented *)
   | Cbswap _
   | Capply _ | Cextcall _ | Cload _ | Calloc _ | Cstore _
@@ -428,7 +429,6 @@ let operation_supported = function
   | Ccsel _
   | Craise _
   | Ccheckbound
-  | Ccheckalign _
   | Cprobe _ | Cprobe_is_enabled _ | Copaque
   | Cbeginregion | Cendregion
     -> true
