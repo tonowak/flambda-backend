@@ -694,10 +694,11 @@ and sugar_expr ctxt f e =
     end
   | _ -> false
 
-(* Jane Syntax defies the property "if an expression has attributes,
-   [expression] will wrap it in parentheses." Thus, some callsites
-   pass [jane_syntax_parens=true] to ensure that [jane_syntax_expr]
-   puts sufficient parens around the construct.
+(* Postcondition: If [x] has any non-Jane Syntax attributes, the output will
+   be self-delimiting. (I.e., it will be wrapped in parens.)
+
+   Passing [jane_syntax_parens=true] will insert parens around Jane Syntax
+   expressions that aren't already self-delimiting.
 *)
 and expression ?(jane_syntax_parens = false) ctxt f x =
   match Jane_syntax.Expression.of_ast x with
@@ -1861,8 +1862,9 @@ and directive_argument f x =
   | Pdir_ident (li) -> pp f "@ %a" longident li
   | Pdir_bool (b) -> pp f "@ %s" (string_of_bool b)
 
-(* [parens] is whether parens are required for constructs that aren't already
-   surrounded in parens/brackets.
+(* [parens] is whether parens should be inserted around constructs that aren't
+   already self-delimiting. E.g. immutable arrays are self-delimiting because
+   they begin and end in a bracket.
 *)
 and jane_syntax_expr ctxt attrs f (jexp : Jane_syntax.Expression.t) ~parens =
   if attrs <> [] then
