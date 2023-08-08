@@ -8,18 +8,32 @@ module Type_decl_shape = struct
       definition : tds
     }
 
+  let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
+    let length =
+      match cstr_args.cd_args with
+      | Cstr_tuple list -> List.length list
+      | Cstr_record list -> List.length list
+    in
+    length == 0
+  ;;
+
   let of_type_declaration path (type_declaration : Types.type_declaration) =
     match type_declaration.type_kind with
     | Type_variant (cstr_list, _variant_repr) ->
-      Format.eprintf "add_type id=%a\n%!" Path.print path;
-      { path
-      ; definition = Tds_variant {
-          constructors = List.map
-                           (fun
-                             (cstr : Types.constructor_declaration)
-                             -> Ident.name cstr.cd_id) cstr_list
-        }
-      }
+      let is_simple_variant =
+        List.for_all is_empty_constructor_list cstr_list
+      in
+      (match is_simple_variant with
+      | false -> { path; definition = Tds_other }
+      | true ->
+        Format.eprintf "add_type id=%a\n%!" Path.print path;
+        { path
+        ; definition = Tds_variant {
+            constructors = List.map
+              (fun (cstr : Types.constructor_declaration) -> Ident.name cstr.cd_id)
+              cstr_list
+          }
+        })
     | Type_record _ | Type_abstract | Type_open ->
       { path; definition = Tds_other }
 end
