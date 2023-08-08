@@ -77,6 +77,7 @@
    typecore
    typeclass typemod typedecl_variance typedecl_properties
    typedecl_separability cmt2annot
+   type_shape
    ; manual update: mli only files
    annot outcometree
 

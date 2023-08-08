@@ -1527,6 +1527,10 @@ let transl_type_decl env rec_flag sdecl_list =
         raise (Error (loc, Separability err))
   in
   (* Compute the final environment with variance and immediacy *)
+  List.iter (fun (id, decl) ->
+    (* CR tnowak: add comments, understand Ident vs Path *)
+    Type_shape.add_to_type_decls (Pident id) decl
+  ) decls;
   let final_env = add_types_to_env decls env in
   (* Check re-exportation *)
   let decls = List.map2 (check_abbrev final_env) sdecl_list decls in
