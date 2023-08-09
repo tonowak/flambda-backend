@@ -908,6 +908,7 @@ let transl_primitive loc p env ty ~poly_mode path =
           let arg_mode = to_alloc_mode arg in
           let params, return = make_params ret_ty repr_args repr_res in
           { name = Ident.create_local "prim";
+            var_uid = Uid.internal_not_actually_unique; (* CR tnowak: verify *)
             layout = arg_layout;
             attributes = Lambda.default_param_attribute;
             mode = arg_mode }

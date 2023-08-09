@@ -1,3 +1,5 @@
+module Uid = Shape.Uid
+
 module Type_decl_shape : sig
   type tds =
     | Tds_variant of { constructors : string list }
@@ -7,6 +9,8 @@ module Type_decl_shape : sig
     { path : Path.t;
       definition : tds
     }
+
+  val print : Format.formatter -> t -> unit
 end
 
 
@@ -21,8 +25,11 @@ module Type_shape : sig
      option | Ttyp_variant of row_field list * closed_flag * label list option |
      Ttyp_poly of (string * const_layout option) list * core_type | Ttyp_package
      of package_type *)
+  val print : Format.formatter -> t -> unit
 end
 
-val all_type_decls : Type_decl_shape.t Shape.Uid.Tbl.t
-val all_ident_types : Type_shape.t Ident.Tbl.t
+val all_type_decls : Type_decl_shape.t Uid.Tbl.t
+val all_type_shapes : Type_shape.t Uid.Tbl.t
 val add_to_type_decls : Path.t -> Types.type_declaration -> unit
+(* Passing [Path.t -> Uid.t] instead of [Env.t] to avoid a dependency cycle. *)
+val add_to_type_shapes : Uid.t -> Types.type_desc -> (Path.t -> Uid.t) -> unit

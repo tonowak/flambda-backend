@@ -247,11 +247,14 @@ let rec translate_bindings
              local, [nlocal] has to be equal to the number of parameters *)
           ~params:[
             {name = element;
+             (* CR tnowak: verify (I see that I'm not the only one that is unsure here...) *)
+             var_uid = Uid.internal_not_actually_unique;
              layout = element_kind;
              attributes = Lambda.default_param_attribute;
              (* CR ncourant: check *)
              mode = alloc_heap};
             {name = inner_acc;
+             var_uid = Uid.internal_not_actually_unique;
              layout = Pvalue Pgenval;
              attributes = Lambda.default_param_attribute;
              mode = alloc_local}

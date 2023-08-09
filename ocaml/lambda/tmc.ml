@@ -62,10 +62,12 @@ and offset = Offset of lambda
 let offset_code (Offset t) = t
 
 let add_dst_params ({var; offset} : Ident.t destination) params =
-  { name = var ; layout = Lambda.layout_block ;
-    attributes = Lambda.default_param_attribute ; mode = alloc_heap } ::
-  { name = offset ; layout = Lambda.layout_int ;
-    attributes = Lambda.default_param_attribute ; mode = alloc_heap } ::
+  { name = var ; var_uid = Uid.internal_not_actually_unique (* CR tnowak: verify *) ;
+    layout = Lambda.layout_block ; attributes = Lambda.default_param_attribute ;
+    mode = alloc_heap } ::
+  { name = offset ; var_uid = Uid.internal_not_actually_unique ;
+    layout = Lambda.layout_int ; attributes = Lambda.default_param_attribute ;
+    mode = alloc_heap } ::
   params
 
 let add_dst_args ({var; offset} : offset destination) args =

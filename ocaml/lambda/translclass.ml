@@ -68,7 +68,9 @@ let lapply ap =
       Lapply ap
 
 let lparam name layout : Lambda.lparam =
-  { name; layout;
+  { name;
+    var_uid = Uid.internal_not_actually_unique (* CR tnowak: verify *);
+    layout;
     attributes = Lambda.default_param_attribute; mode = alloc_heap }
 
 let mkappl (func, args, layout) =

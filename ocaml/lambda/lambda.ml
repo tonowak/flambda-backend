@@ -16,6 +16,8 @@
 open Misc
 open Asttypes
 
+module Uid = Shape.Uid
+
 type mutable_flag = Immutable | Immutable_unique | Mutable
 
 type compile_time_constant =
@@ -541,6 +543,8 @@ type parameter_attribute = No_attributes
 
 type lparam = {
   name : Ident.t;
+  (* This is the uid of the variable, not of the type of the variable. *)
+  var_uid : Uid.t;
   layout : layout;
   attributes : parameter_attribute;
   mode : alloc_mode

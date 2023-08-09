@@ -800,6 +800,7 @@ let split_default_wrapper ~id:fun_id ~kind ~params ~return ~body
             (* If the param is optional, then it must be a value *)
             {
               name = List.assoc p.name map;
+              var_uid = Uid.internal_not_actually_unique; (* CR tnowak: verify *)
               layout = Lambda.layout_field;
               attributes = Lambda.default_param_attribute;
               mode = p.mode

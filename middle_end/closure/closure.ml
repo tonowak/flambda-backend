@@ -1101,6 +1101,7 @@ let rec close ({ backend; fenv; cenv ; mutable_vars; kinds; catch_env } as env) 
         let final_args =
           List.map (fun kind -> {
                 name = V.create_local "arg";
+                var_uid = Uid.internal_not_actually_unique (* CR tnowak: verify *);
                 layout = kind;
                 attributes = Lambda.default_param_attribute;
                 mode = new_clos_mode

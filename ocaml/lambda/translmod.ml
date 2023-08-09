@@ -132,7 +132,9 @@ let rec apply_coercion loc strict restr arg =
       let param = Ident.create_local "funarg" in
       let carg = apply_coercion loc Alias cc_arg (Lvar param) in
       apply_coercion_result loc strict arg
-        [{name = param; layout = Lambda.layout_module;
+        [{name = param;
+          var_uid = Uid.internal_not_actually_unique (* CR tnowak: verify *);
+          layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute; mode = alloc_heap}]
         [carg] cc_res
   | Tcoerce_primitive { pc_desc; pc_env; pc_type; pc_poly_mode } ->
@@ -152,6 +154,7 @@ and apply_coercion_result loc strict funct params args cc_res =
     let arg = apply_coercion loc Alias cc_arg (Lvar param) in
     apply_coercion_result loc strict funct
       ({ name = param;
+         var_uid = Uid.internal_not_actually_unique (* CR tnowak: verify *);
          layout = Lambda.layout_module;
          attributes = Lambda.default_param_attribute;
          mode = alloc_heap } :: params)
@@ -568,6 +571,7 @@ let rec compile_functor ~scopes mexp coercion root_path loc =
         let arg = apply_coercion loc Alias arg_coercion (Lvar param') in
         let params = {
           name = param';
+          var_uid = Uid.internal_not_actually_unique (* CR tnowak: verify *);
           layout = Lambda.layout_module;
           attributes = Lambda.default_param_attribute;
           mode = alloc_heap

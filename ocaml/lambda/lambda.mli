@@ -17,6 +17,8 @@
 
 open Asttypes
 
+module Uid = Shape.Uid
+
 (* Overriding Asttypes.mutable_flag *)
 type mutable_flag = Immutable | Immutable_unique | Mutable
 
@@ -418,6 +420,7 @@ type parameter_attribute = No_attributes
 
 type lparam = {
   name : Ident.t;
+  var_uid : Uid.t;
   layout : layout;
   attributes : parameter_attribute;
   mode : alloc_mode
