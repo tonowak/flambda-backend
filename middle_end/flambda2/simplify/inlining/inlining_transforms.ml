@@ -38,6 +38,7 @@ let make_inlined_body ~callee ~unroll_to ~params ~args ~my_closure ~my_region
   in
   let my_closure =
     Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
+      Shape.Uid.internal_not_actually_unique (* CR tnowak: maybe here? *)
   in
   let bind_params ~params ~args ~body =
     if List.compare_lengths params args <> 0

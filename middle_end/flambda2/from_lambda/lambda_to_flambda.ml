@@ -1656,6 +1656,7 @@ and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
     List.map
       (fun (p : Lambda.lparam) : Function_decl.param ->
         { name = p.name;
+          var_uid = p.var_uid;
           kind = Flambda_kind.With_subkind.from_lambda p.layout;
           attributes = p.attributes;
           mode = p.mode

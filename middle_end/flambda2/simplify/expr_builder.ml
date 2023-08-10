@@ -757,12 +757,11 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
     | Continuation cont -> (
       (* In this case, any generated [Apply_cont] will sit inside a wrapper that
          binds [kinded_params]. *)
-      let params =
-        List.map
-          (fun _kind -> Variable.create "param")
-          (Flambda_arity.to_list arity)
+      let params = List.map (fun kind -> BP.create (Variable.create "param")
+                              kind Shape.Uid.internal_not_actually_unique
+                                           (* CR tnowak: verify *))
+                     (Flambda_arity.to_list arity)
       in
-      let params = List.map2 BP.create params (Flambda_arity.to_list arity) in
       let args = List.map BP.simple params in
       let params = Bound_parameters.create params in
       let apply_cont = Apply_cont.create cont ~args ~dbg:Debuginfo.none in

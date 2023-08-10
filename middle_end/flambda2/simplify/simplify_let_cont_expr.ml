@@ -220,7 +220,8 @@ let extra_params_for_continuation_param_aliases cont uacc rewrite_ids =
           (Variable.Map.find var aliases_kind)
           Anything
       in
-      EPA.add ~extra_param:(Bound_parameter.create var var_kind) ~extra_args epa)
+      EPA.add ~extra_param:(Bound_parameter.create var var_kind
+          Shape.Uid.internal_not_actually_unique (* CR tnowak: maybe? *)) ~extra_args epa)
     required_extra_args.extra_args_for_aliases EPA.empty
 
 let add_extra_params_for_mutable_unboxing cont uacc extra_params_and_args =

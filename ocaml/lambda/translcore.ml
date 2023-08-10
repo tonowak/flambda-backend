@@ -1179,10 +1179,10 @@ and transl_apply ~scopes
   in
   build_apply lam [] loc position mode args
 
-and add_type_shapes_of_vars cases env =
-  let uid_of_path path = (Env.find_type path env).type_uid in
+and add_type_shapes_of_vars cases =
   let add_case (case : Typedtree.value Typedtree.case) =
     let var_list = Typedtree.pat_bound_idents_full Sort.value case.c_lhs in
+    let uid_of_path path = (Env.find_type path case.c_lhs.pat_env).type_uid in
     List.iter (fun (_ident, _loc, type_expr, var_uid, _mode) ->
         Type_shape.add_to_type_shapes var_uid (get_desc type_expr) uid_of_path)
       var_list
@@ -1202,7 +1202,7 @@ and uids_of_vars cases =
 
 and transl_curried_function
       ~scopes ~arg_sort ~arg_layout ~arg_mode ~return_sort ~return_layout loc repr ~region
-      ~curry ~uid_of_var partial warnings (param:Ident.t) cases =
+      ~curry partial warnings (param:Ident.t) cases =
   let max_arity = Lambda.max_arity () in
   let rec loop ~scopes ~arg_sort ~arg_layout ~return_sort ~return_layout loc
             ~arity ~region ~curry ~arg_mode partial warnings (param:Ident.t) cases =
@@ -1244,9 +1244,11 @@ and transl_curried_function
              Curried {nlocal = nlocal + 1}
         in
         let arg_mode = transl_alloc_mode arg_mode in
+        add_type_shapes_of_vars cases;
         let params = {
           name = param ;
-          var_uid = uid_of_var param ;
+          var_uid = Ident.Tbl.find_opt (uids_of_vars cases) param
+                    |> Option.value ~default:Uid.internal_not_actually_unique ;
           layout = arg_layout ;
           attributes = Lambda.default_param_attribute ;
           mode = arg_mode
@@ -1266,19 +1268,19 @@ and transl_curried_function
         | Partial -> ()
         end;
         transl_tupled_function ~scopes ~arg_sort ~arg_layout ~arg_mode
-          ~return_sort:ret_sort ~return_layout ~arity ~region ~curry ~uid_of_var
+          ~return_sort:ret_sort ~return_layout ~arity ~region ~curry
           loc repr partial param cases
       end
     | curry, cases ->
       transl_tupled_function ~scopes ~arg_sort ~arg_layout ~arg_mode ~return_sort
-        ~return_layout ~arity ~region ~curry ~uid_of_var loc repr partial param cases
+        ~return_layout ~arity ~region ~curry loc repr partial param cases
   in
   loop ~scopes ~arg_sort ~arg_layout ~arg_mode ~return_sort ~return_layout loc ~arity:1
     ~region ~curry partial warnings param cases
 
 and transl_tupled_function
       ~scopes ~arg_layout ~arg_sort ~arg_mode ~return_sort ~return_layout ~arity ~region
-      ~curry ~uid_of_var loc repr partial (param:Ident.t) cases =
+      ~curry loc repr partial (param:Ident.t) cases =
   let partial_mode =
     match curry with
     | More_args {partial_mode} | Final_arg {partial_mode} ->
@@ -1325,15 +1327,15 @@ and transl_tupled_function
         ((Tupled, tparams, return_layout, region), body)
     with Matching.Cannot_flatten ->
       transl_function0 ~scopes ~arg_sort ~arg_layout ~arg_mode ~return_sort ~return_layout
-        loc ~region ~partial_mode ~uid_of_var repr partial param cases
+        loc ~region ~partial_mode repr partial param cases
       end
   | _ -> transl_function0 ~scopes ~arg_sort ~arg_layout ~arg_mode ~return_sort
-           ~return_layout loc ~region ~partial_mode ~uid_of_var
+           ~return_layout loc ~region ~partial_mode
            repr partial param cases
 
 and transl_function0
       ~scopes ~arg_sort ~arg_layout ~arg_mode ~return_sort ~return_layout loc ~region
-      ~partial_mode ~uid_of_var repr partial (param:Ident.t) cases =
+      ~partial_mode repr partial (param:Ident.t) cases =
     let body =
       Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout loc
         repr (Lvar param) (transl_cases ~scopes return_sort cases) partial
@@ -1346,9 +1348,11 @@ and transl_function0
         | Alloc_heap -> 0
     in
     let arg_mode = transl_alloc_mode arg_mode in
+    add_type_shapes_of_vars cases;
     ((Curried {nlocal},
       [{ name = param;
-         var_uid = uid_of_var param;
+         var_uid = Ident.Tbl.find_opt (uids_of_vars cases) param
+            |> Option.value ~default:Uid.internal_not_actually_unique;
          layout = arg_layout;
          attributes = Lambda.default_param_attribute;
          mode = arg_mode}],
@@ -1360,12 +1364,6 @@ and transl_function ~scopes e alloc_mode param arg_mode arg_sort return_sort
   let arg_layout =
     function_arg_layout e.exp_env e.exp_loc arg_sort e.exp_type
   in
-  add_type_shapes_of_vars cases e.exp_env;
-  let uids_of_vars = uids_of_vars cases in
-  let uid_of_var ident = match Ident.Tbl.find_opt uids_of_vars ident with
-    | Some uid -> uid
-    | None -> Uid.internal_not_actually_unique
-  in
   let ((kind, params, return, region), body) =
     event_function ~scopes e
       (function repr ->
@@ -1376,7 +1374,7 @@ and transl_function ~scopes e alloc_mode param arg_mode arg_sort return_sort
            function_return_layout e.exp_env e.exp_loc return_sort e.exp_type
          in
          transl_curried_function ~arg_sort ~arg_layout ~arg_mode ~return_sort
-           ~return_layout ~scopes e.exp_loc repr ~region ~curry ~uid_of_var
+           ~return_layout ~scopes e.exp_loc repr ~region ~curry
            partial warnings param pl)
   in
   let attr = default_function_attribute in
@@ -1781,14 +1779,13 @@ and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
     in
     let return_layout = layout_exp case_sort case.c_rhs in
     let curry = More_args { partial_mode = Alloc_mode.global } in
-    let uid_of_var (_ : Ident.t) = Uid.internal_not_actually_unique in
     let (kind, params, return, _region), body =
       event_function ~scopes case.c_rhs
         (function repr ->
            transl_curried_function ~scopes ~arg_sort:param_sort ~arg_layout
              ~arg_mode:(Amode Global) ~return_sort:case_sort
              ~return_layout case.c_rhs.exp_loc repr ~region:true ~curry
-             ~uid_of_var partial warnings param [case])
+             partial warnings param [case])
     in
     let attr = default_function_attribute in
     let loc = of_location ~scopes case.c_rhs.exp_loc in

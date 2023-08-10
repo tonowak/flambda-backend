@@ -573,6 +573,7 @@ and print_function_params_and_body ppf t =
       ~is_my_closure_used:_ ~my_region ~my_depth ~free_names_of_body:_ =
     let my_closure =
       Bound_parameter.create my_closure (K.With_subkind.create K.value Anything)
+        Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *)
     in
     fprintf ppf
       "@[<hov 1>(%t@<1>\u{03bb}%t@[<hov \

@@ -19,6 +19,8 @@
 
 include module type of struct include Ident end
 
+module Uid = Shape.Uid
+
 type backend_var = t
 
 val name_for_debugger : t -> string
@@ -31,6 +33,7 @@ module Provenance : sig
      : module_path:Path.t
     -> location:Debuginfo.t
     -> original_ident:Ident.t
+    -> uid:Uid.t
     -> t
 
   val module_path : t -> Path.t

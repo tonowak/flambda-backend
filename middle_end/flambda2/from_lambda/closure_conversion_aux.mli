@@ -14,6 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Uid = Shape.Uid
+
 (** Environments and auxiliary structures used during closure conversion. *)
 
 module IR : sig
@@ -295,6 +297,7 @@ module Function_decls : sig
 
     type param =
       { name : Ident.t;
+        var_uid : Uid.t;
         kind : Flambda_kind.With_subkind.t;
         attributes : Lambda.parameter_attribute;
         mode : Lambda.alloc_mode

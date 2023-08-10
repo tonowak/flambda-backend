@@ -17,6 +17,7 @@ module C = Cmm_helpers
 module R = To_cmm_result
 module P = Flambda_primitive
 module Ece = Effects_and_coeffects
+module Uid = Shape.Uid
 
 type free_vars = Backend_var.Set.t
 
@@ -282,7 +283,7 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable v =
+let gen_variable ?(uid = Uid.internal_not_actually_unique) v =
   let user_visible = Variable.user_visible v in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
@@ -296,7 +297,7 @@ let gen_variable v =
          be reworked soon *)
       Some
         (Backend_var.Provenance.create ~module_path:(Path.Pident v)
-           ~location:Debuginfo.none ~original_ident:v)
+           ~location:Debuginfo.none ~original_ident:v ~uid)
   in
   Backend_var.With_provenance.create ?provenance v
 
@@ -306,12 +307,12 @@ let add_bound_param env v v' =
   let vars = Variable.Map.add v (C.var v'', free_vars) env.vars in
   { env with vars }
 
-let create_bound_parameter env v =
+let create_bound_parameter env (v, uid) =
   if Variable.Map.mem v env.vars
   then
     Misc.fatal_errorf "Cannot rebind variable %a in To_cmm environment"
       Variable.print v;
-  let v' = gen_variable v in
+  let v' = gen_variable v ~uid in
   let env = add_bound_param env v v' in
   env, v'
 

@@ -252,6 +252,7 @@ let rec bind_rec acc exn_cont ~register_const0 (prim : expr_primitive)
     let result_var = Variable.create "if_then_else_result" in
     let result_param =
       Bound_parameter.create result_var Flambda_kind.With_subkind.any_value
+        Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *)
     in
     bind_rec acc exn_cont ~register_const0 cond dbg @@ fun acc cond ->
     let compute_cond_and_switch acc =

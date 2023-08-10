@@ -578,7 +578,8 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
   let wrap_c_call acc ~handler_param ~code_after_call c_call =
     let return_kind = Flambda_kind.With_subkind.create return_kind Anything in
     let params =
-      [BP.create handler_param return_kind] |> Bound_parameters.create
+      [BP.create handler_param return_kind Shape.Uid.internal_not_actually_unique
+      (* CR tnowak: verify *)] |> Bound_parameters.create
     in
     Let_cont_with_acc.build_non_recursive acc return_continuation
       ~handler_params:params ~handler:code_after_call ~body:c_call
@@ -1073,7 +1074,9 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
         Continuation.print name);
   let handler_env, env_params = Env.add_vars_like env params in
   let handler_params =
-    List.map2 (fun param (_, _, kind) -> BP.create param kind) env_params params
+    List.map2 (fun param (_, _, kind) -> BP.create param kind
+                Shape.Uid.internal_not_actually_unique (* CR tnowak: that's probably the place *))
+      env_params params
     |> Bound_parameters.create
   in
   let handler acc =
@@ -1491,7 +1494,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot decl
     List.map
       (fun (p : Function_decl.param) ->
         let var = fst (Env.find_var closure_env p.name) in
-        BP.create var p.kind)
+        BP.create var p.kind p.var_uid)
       params
     |> Bound_parameters.create
   in
@@ -2046,6 +2049,7 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
     List.mapi
       (fun n (kind, mode) : Function_decl.param ->
         { name = Ident.create_local ("param" ^ string_of_int (num_provided + n));
+          var_uid = Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *);
           kind;
           attributes = Lambda.default_param_attribute;
           mode = Alloc_mode.For_types.to_lambda mode
@@ -2192,7 +2196,8 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
       let over_application_results =
         List.mapi
           (fun i kind ->
-            BP.create (Variable.create ("result" ^ string_of_int i)) kind)
+             BP.create (Variable.create ("result" ^ string_of_int i)) kind
+               Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
           (Flambda_arity.to_list apply.return_arity)
       in
       let handler acc =
@@ -2220,7 +2225,7 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
   let acc, both_applications =
     Let_cont_with_acc.build_non_recursive acc wrapper_cont
       ~handler_params:
-        ([BP.create returned_func K.With_subkind.any_value]
+        ([BP.create returned_func K.With_subkind.any_value Shape.Uid.internal_not_actually_unique (* CR tnowak: maybe? *)]
         |> Bound_parameters.create)
       ~handler:perform_over_application ~body ~is_exn_handler:false
       ~is_cold:false
@@ -2537,7 +2542,7 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
       (acc, body) (List.rev field_vars)
   in
   let load_fields_handler_param =
-    [BP.create module_block_var K.With_subkind.any_value]
+    [BP.create module_block_var K.With_subkind.any_value Shape.Uid.internal_not_actually_unique (* CR tnowak: maybe? *)]
     |> Bound_parameters.create
   in
   (* This binds the return continuation that is free (or, at least, not bound)

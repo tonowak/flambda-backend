@@ -14,6 +14,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Uid = Shape.Uid
+
 module IR = struct
   type simple =
     | Var of Ident.t
@@ -674,6 +676,7 @@ module Function_decls = struct
   module Function_decl = struct
     type param =
       { name : Ident.t;
+        var_uid : Uid.t;
         kind : Flambda_kind.With_subkind.t;
         attributes : Lambda.parameter_attribute;
         mode : Lambda.alloc_mode

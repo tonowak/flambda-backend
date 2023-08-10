@@ -343,6 +343,7 @@ let params_and_body0 env res code_id ~fun_dbg ~check ~return_continuation
     else
       let my_closure_param =
         Bound_parameter.create my_closure Flambda_kind.With_subkind.any_value
+          Shape.Uid.internal_not_actually_unique (* CR tnowak: maybe? *)
       in
       Bound_parameters.append params
         (Bound_parameters.create [my_closure_param])
@@ -357,7 +358,9 @@ let params_and_body0 env res code_id ~fun_dbg ~check ~return_continuation
      code, so we don't need any binder for it (this is why we can ignore
      [_bound_var]). If it does end up in generated code, Selection will complain
      and refuse to compile the code. *)
-  let env, my_region_var = Env.create_bound_parameter env my_region in
+  let env, my_region_var = Env.create_bound_parameter env
+    (my_region, Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
+  in
   (* Translate the arg list and body *)
   let env, fun_params = C.bound_parameters env params in
   let fun_body, fun_body_free_vars, res = translate_expr env res body in

@@ -423,7 +423,7 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
       List.map
         (fun kind ->
           let param = Variable.create "param" in
-          Bound_parameter.create param kind)
+          Bound_parameter.create param kind Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
         remaining_param_arity
       |> Bound_parameters.create
     in
