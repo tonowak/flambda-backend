@@ -63,6 +63,7 @@ module Provenance = struct
   let module_path t = t.module_path
   let location t = t.location
   let original_ident t = t.original_ident
+  let uid t = t.uid
 
   let equal t1 t2 = Stdlib.compare t1 t2 = 0
 end

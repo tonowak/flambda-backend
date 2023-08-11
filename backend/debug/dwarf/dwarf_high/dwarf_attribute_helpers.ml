@@ -281,6 +281,10 @@ let create_linkage_name ~linkage_name =
   let spec = AS.create Linkage_name Strp in
   AV.create spec (V.indirect_string ~comment:"linkage name" linkage_name)
 
+let create_const_value ~value =
+  let spec = AS.create Const_value Data8 in
+  AV.create spec (V.int64 value)
+
 let create_const_value_from_symbol ~symbol =
   match Targetint.size with
   | 32 ->

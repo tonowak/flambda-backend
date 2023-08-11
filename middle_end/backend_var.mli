@@ -39,6 +39,7 @@ module Provenance : sig
   val module_path : t -> Path.t
   val location : t -> Debuginfo.t
   val original_ident : t -> Ident.t
+  val uid : t -> Uid.t
 
   val print : Format.formatter -> t -> unit
 

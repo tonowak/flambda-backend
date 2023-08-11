@@ -130,6 +130,9 @@ val create_single_call_data_location_description :
 val create_single_call_data_value_location_description :
   Single_location_description.t -> Dwarf_attribute_values.Attribute_value.t
 
+val create_const_value :
+  value:Int64.t -> Dwarf_attribute_values.Attribute_value.t
+
 val create_const_value_from_symbol :
   symbol:Asm_symbol.t -> Dwarf_attribute_values.Attribute_value.t
 

@@ -202,10 +202,15 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
         | Parameter _ -> Backend_var.name_for_debugger var
         | Local -> Backend_var.unique_name_for_debugger var
       in
+      let proto_die_reference = Proto_die.reference (
+        match provenance with
+        | Some provenance ->
+          Dwarf_type.variant_for_var state (Backend_var.Provenance.uid provenance)
+            ~parent_proto_die
+        | None -> DS.value_type_proto_die state)
+      in
       let type_attribute =
-        [ DAH.create_type_from_reference
-            ~proto_die_reference:
-              (Proto_die.reference (DS.value_type_proto_die state)) ]
+        [ DAH.create_type_from_reference ~proto_die_reference ]
       in
       let name_attribute = [DAH.create_name name_for_var] in
       name_attribute @ type_attribute
