@@ -45,7 +45,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
               ~fallback_die
           in
           let member_attributes =
-            [ DAH.create_name (Format.sprintf "tuple_field%d" i);
+            [ (*DAH.create_name (Format.sprintf "tuple_field%d" i);*)
               DAH.create_type ~proto_die:type_die;
               DAH.create_data_member_location
                 ~byte_offset:(Int64.of_int (i * 8)) ]
