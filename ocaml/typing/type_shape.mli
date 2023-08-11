@@ -17,6 +17,7 @@ end
 module Type_shape : sig
   type t =
     | Ts_constr of Shape.Uid.t
+    | Ts_tuple of t list
     | Ts_other
   (* | Ttyp_var of string option * const_layout option | Ttyp_arrow of arg_label
      * core_type * core_type | Ttyp_tuple of core_type list | Ttyp_object of

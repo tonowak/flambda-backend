@@ -55,6 +55,7 @@ end
 module Type_shape = struct
   type t =
     | Ts_constr of Uid.t
+    | Ts_tuple of t list
     | Ts_other
   (* | Ttyp_var of string option * const_layout option | Ttyp_arrow of arg_label
      * core_type * core_type | Ttyp_tuple of core_type list | Ttyp_object of
@@ -64,16 +65,24 @@ module Type_shape = struct
      Ttyp_poly of (string * const_layout option) list * core_type | Ttyp_package
      of package_type *)
 
-  let of_type_desc desc uid_of_path = match desc with
-    | Types.Tconstr (path, constrs, _abbrev_memo) ->
+  let rec of_type_desc (desc : Types.type_desc) uid_of_path = match desc with
+    | Tconstr (path, constrs, _abbrev_memo) ->
       (match constrs with
        | [] -> Ts_constr (uid_of_path path)
        | _ :: _ -> Ts_other)
+    | Ttuple exprs ->
+      Ts_tuple (List.map (fun expr -> of_type_desc (Types.get_desc expr) uid_of_path)
+        exprs)
     | _ -> Ts_other
 
-  let print ppf = function
+  let rec print ppf = function
     | Ts_constr uid ->
       Format.fprintf ppf "Ts_constr uid=%a" Uid.print uid
+    | Ts_tuple shapes ->
+      Format.fprintf ppf "Ts_tuple (%a)"
+        (Format.pp_print_list ~pp_sep:(fun ppf () ->
+           Format.pp_print_string ppf ", ") print)
+        shapes
     | Ts_other -> Format.fprintf ppf "Ts_other"
 end
 
