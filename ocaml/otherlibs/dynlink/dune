@@ -59,6 +59,7 @@
     primitive
     types
     btype
+    type_shape
     lazy_backtrack
     subst
     predef
@@ -145,6 +146,7 @@
 (copy_files ../../typing/shape.ml)
 (copy_files ../../typing/types.ml)
 (copy_files ../../typing/btype.ml)
+(copy_files ../../typing/type_shape.ml)
 (copy_files ../../typing/subst.ml)
 (copy_files ../../typing/predef.ml)
 (copy_files ../../typing/datarepr.ml)
@@ -204,6 +206,7 @@
 (copy_files ../../typing/shape.mli)
 (copy_files ../../typing/types.mli)
 (copy_files ../../typing/btype.mli)
+(copy_files ../../typing/type_shape.mli)
 (copy_files ../../typing/subst.mli)
 (copy_files ../../typing/predef.mli)
 (copy_files ../../typing/datarepr.mli)
