@@ -17,24 +17,26 @@ module Type_decl_shape = struct
       | Cstr_record list -> List.length list
     in
     length == 0
-  ;;
 
   let of_type_declaration path (type_declaration : Types.type_declaration) =
     match type_declaration.type_kind with
-    | Type_variant (cstr_list, _variant_repr) ->
+    | Type_variant (cstr_list, _variant_repr) -> (
       let is_simple_variant =
         List.for_all is_empty_constructor_list cstr_list
       in
-      (match is_simple_variant with
+      match is_simple_variant with
       | false -> { path; definition = Tds_other }
       | true ->
         Format.eprintf "add_type id=%a\n%!" Path.print path;
-        { path
-        ; definition = Tds_variant {
-            constructors = List.map
-              (fun (cstr : Types.constructor_declaration) -> Ident.name cstr.cd_id)
-              cstr_list
-          }
+        { path;
+          definition =
+            Tds_variant
+              { constructors =
+                  List.map
+                    (fun (cstr : Types.constructor_declaration) ->
+                      Ident.name cstr.cd_id)
+                    cstr_list
+              }
         })
     | Type_record _ | Type_abstract | Type_open ->
       { path; definition = Tds_other }
@@ -42,14 +44,14 @@ module Type_decl_shape = struct
   let print_tds ppf = function
     | Tds_variant { constructors } ->
       Format.fprintf ppf "Tds_variant constructors=%a"
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string)
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space
+           Format.pp_print_string)
         constructors
-    | Tds_other ->
-      Format.fprintf ppf "Tds_other"
+    | Tds_other -> Format.fprintf ppf "Tds_other"
 
   let print ppf t =
-    Format.fprintf ppf "path=%a, definition=(%a)"
-      Path.print t.path print_tds t.definition
+    Format.fprintf ppf "path=%a, definition=(%a)" Path.print t.path print_tds
+      t.definition
 end
 
 module Type_shape = struct
@@ -65,28 +67,32 @@ module Type_shape = struct
      Ttyp_poly of (string * const_layout option) list * core_type | Ttyp_package
      of package_type *)
 
-  let rec of_type_desc (desc : Types.type_desc) uid_of_path = match desc with
-    | Tconstr (path, constrs, _abbrev_memo) ->
-      (match constrs with
-       | [] -> Ts_constr (uid_of_path path)
-       | _ :: _ -> Ts_other)
+  let rec of_type_desc (desc : Types.type_desc) uid_of_path =
+    match desc with
+    | Tconstr (path, constrs, _abbrev_memo) -> (
+      match constrs with
+      | [] -> Ts_constr (uid_of_path path)
+      | _ :: _ -> Ts_other)
     | Ttuple exprs ->
-      Ts_tuple (List.map (fun expr -> of_type_desc (Types.get_desc expr) uid_of_path)
-        exprs)
+      Ts_tuple
+        (List.map
+           (fun expr -> of_type_desc (Types.get_desc expr) uid_of_path)
+           exprs)
     | _ -> Ts_other
 
   let rec print ppf = function
-    | Ts_constr uid ->
-      Format.fprintf ppf "Ts_constr uid=%a" Uid.print uid
+    | Ts_constr uid -> Format.fprintf ppf "Ts_constr uid=%a" Uid.print uid
     | Ts_tuple shapes ->
       Format.fprintf ppf "Ts_tuple (%a)"
-        (Format.pp_print_list ~pp_sep:(fun ppf () ->
-           Format.pp_print_string ppf ", ") print)
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
+           print)
         shapes
     | Ts_other -> Format.fprintf ppf "Ts_other"
 end
 
 let all_type_decls = Uid.Tbl.create 42
+
 let all_type_shapes = Uid.Tbl.create 42
 
 let add_to_type_decls path (type_decl : Types.type_declaration) =
