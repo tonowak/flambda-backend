@@ -3,6 +3,13 @@ open! Dwarf_high
 module Uid = Shape.Uid
 module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
+module SLDL = Simple_location_description_lang
+
+let need_rvalue (type_shape : Type_shape.Type_shape.t) =
+  (* The location descriptions for values that are boxed need to evaluate to the
+     actual pointer ("rvalue" in the sense of Dwarf_variables_and_parameters)
+     instead of a location describing where the pointer lives ("lvalue"). *)
+  match type_shape with Ts_other | Ts_constr _ -> false | Ts_tuple _ -> true
 
 let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     ~parent_proto_die ~fallback_die =
@@ -45,11 +52,32 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
               ~fallback_die
           in
           let member_attributes =
-            [ (*DAH.create_name (Format.sprintf "tuple_field%d" i);*)
+            [ DAH.create_name (Format.sprintf "tuple_field%d" i);
               DAH.create_type ~proto_die:type_die;
-              DAH.create_data_member_location
-                ~byte_offset:(Int64.of_int (i * 8)) ]
+              (match need_rvalue type_shape with
+              | false ->
+                DAH.create_data_member_location_offset
+                  ~byte_offset:(Int64.of_int (i * 8))
+              | true ->
+                SLDL.Rvalue.read_field_from_block_on_dwarf_stack
+                  ~field:(Targetint.of_int i)
+                |> SLDL.of_rvalue |> SLDL.compile
+                |> Single_location_description.of_simple_location_description
+                |> DAH.create_data_member_location_description) ]
           in
+          (* CR tnowak: remove this comment that contains code for constructing
+             a Pointer_type *)
+          (* let member_type = match need_rvalue type_shape with | false ->
+             type_die | true -> let pointer_attributes = [
+             DAH.create_byte_size_exn ~byte_size:8; DAH.create_type
+             ~proto_die:type_die ] (* CR tnowak: consider making a sibling
+             attribute in [structure_type] *) in let pointer_die =
+             Proto_die.create ~parent:(Some parent_proto_die)
+             ~tag:Dwarf_tag.Pointer_type ~attribute_values:pointer_attributes ()
+             in pointer_die in let member_attributes = [ DAH.create_name
+             (Format.sprintf "tuple_field%d" i);
+             DAH.create_data_member_location_offset ~byte_offset:(Int64.of_int
+             (i * 8)); DAH.create_type ~proto_die:member_type ] in *)
           Proto_die.create_ignore ~parent:(Some structure_type)
             ~tag:Dwarf_tag.Member ~attribute_values:member_attributes ();
           type_name)
@@ -59,12 +87,6 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     Proto_die.add_or_replace_attribute_value structure_type
       (DAH.create_name name);
     structure_type, name
-
-let need_rvalue (type_shape : Type_shape.Type_shape.t) =
-  (* The location descriptions for values that are boxed need to evaluate to the
-     actual pointer ("rvalue" in the sense of Dwarf_variables_and_parameters)
-     instead of a location describing where the pointer lives ("lvalue"). *)
-  match type_shape with Ts_other | Ts_constr _ -> false | Ts_tuple _ -> true
 
 type result =
   { die : Proto_die.t;

@@ -103,8 +103,11 @@ val create_byte_size_exn :
 
 val create_bit_size : Int64.t -> Dwarf_attribute_values.Attribute_value.t
 
-val create_data_member_location :
+val create_data_member_location_offset :
   byte_offset:Int64.t -> Dwarf_attribute_values.Attribute_value.t
+
+val create_data_member_location_description :
+  Single_location_description.t -> Dwarf_attribute_values.Attribute_value.t
 
 val create_linkage_name :
   linkage_name:string -> Dwarf_attribute_values.Attribute_value.t

@@ -143,6 +143,10 @@ module Rvalue : sig
       given by the provided simple location description at time T. *)
   val read_field : block:normal t -> field:Targetint.t -> normal t
 
+  (** V will be the contents of the given field of the block that is
+      on the top of the DWARF stack at time T. *)
+  val read_field_from_block_on_dwarf_stack : field:Targetint.t -> normal t
+
   (** V will be the contents of the given field of the given symbol at time T. *)
   val read_symbol_field : Asm_symbol.t -> field:Targetint.t -> normal t
 
