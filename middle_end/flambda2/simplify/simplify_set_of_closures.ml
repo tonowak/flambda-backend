@@ -169,13 +169,13 @@ let simplify_function_body context ~outer_dacc function_slot_opt
       ~implicit_params:
         (Bound_parameters.create
            [ Bound_parameter.create my_closure
-               Flambda_kind.With_subkind.any_value Shape.Uid.internal_not_actually_unique;
+               Flambda_kind.With_subkind.any_value
+               Shape.Uid.internal_not_actually_unique;
              (* CR tnowak: maybe? verify those three *)
              Bound_parameter.create my_region Flambda_kind.With_subkind.region
                Shape.Uid.internal_not_actually_unique;
              Bound_parameter.create my_depth Flambda_kind.With_subkind.rec_info
-               Shape.Uid.internal_not_actually_unique
-           ])
+               Shape.Uid.internal_not_actually_unique ])
       ~loopify_state ~params
   with
   | body, uacc ->
@@ -338,7 +338,8 @@ let simplify_function0 context ~outer_dacc function_slot_opt code_id code
       (fun i kind_with_subkind ->
         BP.create
           (Variable.create ("result" ^ string_of_int i))
-          kind_with_subkind Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
+          kind_with_subkind
+          Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
       (Flambda_arity.to_list result_arity)
     |> Bound_parameters.create
   in

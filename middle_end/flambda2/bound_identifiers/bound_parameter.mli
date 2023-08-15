@@ -26,7 +26,7 @@ val create : Variable.t -> Flambda_kind.With_subkind.t -> Uid.t -> t
 
 val var : t -> Variable.t
 
-val var_and_uid : t -> (Variable.t * Uid.t)
+val var_and_uid : t -> Variable.t * Uid.t
 
 val name : t -> Name.t
 

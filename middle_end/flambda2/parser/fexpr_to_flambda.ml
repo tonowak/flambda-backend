@@ -631,8 +631,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
         (fun ({ param; kind } : Fexpr.kinded_parameter) (env, args) ->
           let var, env = fresh_var env param in
           let param =
-            Bound_parameter.create var (value_kind_with_subkind_opt kind)
-              Bound_parameter.Uid.internal_not_actually_unique (* CR tnowak: verify *)
+            Bound_parameter.create var
+              (value_kind_with_subkind_opt kind)
+              Bound_parameter.Uid.internal_not_actually_unique
+            (* CR tnowak: verify *)
           in
           env, param :: args)
         params (env, [])
@@ -840,8 +842,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
               (fun env ({ param; kind } : Fexpr.kinded_parameter) ->
                 let var, env = fresh_var env param in
                 let param =
-                  Bound_parameter.create var (value_kind_with_subkind_opt kind)
-                    Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *)
+                  Bound_parameter.create var
+                    (value_kind_with_subkind_opt kind)
+                    Shape.Uid.internal_not_actually_unique
+                  (* CR tnowak: verify *)
                 in
                 param, env)
               env params

@@ -358,8 +358,9 @@ let params_and_body0 env res code_id ~fun_dbg ~check ~return_continuation
      code, so we don't need any binder for it (this is why we can ignore
      [_bound_var]). If it does end up in generated code, Selection will complain
      and refuse to compile the code. *)
-  let env, my_region_var = Env.create_bound_parameter env
-    (my_region, Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
+  let env, my_region_var =
+    Env.create_bound_parameter env
+      (my_region, Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
   in
   (* Translate the arg list and body *)
   let env, fun_params = C.bound_parameters env params in

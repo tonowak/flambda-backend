@@ -778,7 +778,8 @@ and apply_expr env res apply =
           Env.flush_delayed_lets ~mode:Branching_point env res
         in
         let env, cmm_params =
-          Env.create_bound_parameters env (List.map Bound_parameter.var_and_uid params)
+          Env.create_bound_parameters env
+            (List.map Bound_parameter.var_and_uid params)
         in
         let label = Lambda.next_raise_count () in
         let params_with_machtype =
