@@ -21,7 +21,7 @@ type t =
   | Papply of t * t
 
 val same: t -> t -> bool
-val compare: t -> t -> int
+(*val compare: t -> t -> int*)
 val find_free_opt: Ident.t list -> t -> Ident.t option
 val exists_free: Ident.t list -> t -> bool
 val scope: t -> int
@@ -31,7 +31,7 @@ val name: ?paren:(string -> bool) -> t -> string
     (* [paren] tells whether a path suffix needs parentheses *)
 val head: t -> Ident.t
 
-val print: Format.formatter -> t -> unit
+(*val print: Format.formatter -> t -> unit*)
 
 val heads: t -> Ident.t list
 
@@ -48,5 +48,10 @@ type typath =
 val constructor_typath: t -> typath
 val is_constructor_typath: t -> bool
 
+(*
 module Map : Map.S with type key = t
 module Set : Set.S with type elt = t
+*)
+(* CR tnowak: permamently add the Tbl in both .ml and .mli files. *)
+
+include Identifiable.S with type t := t

@@ -9,33 +9,229 @@ let need_rvalue (type_shape : Type_shape.Type_shape.t) =
   (* The location descriptions for values that are boxed need to evaluate to the
      actual pointer ("rvalue" in the sense of Dwarf_variables_and_parameters)
      instead of a location describing where the pointer lives ("lvalue"). *)
-  match type_shape with Ts_other | Ts_constr _ -> false | Ts_tuple _ -> true
+  match type_shape with
+  | Ts_other | Ts_constr _ -> false
+  | Ts_tuple _ -> true
+  | Ts_var _ -> false
 
 let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     ~parent_proto_die ~fallback_die =
+  (* CR tnowak: wrong parent? *)
   match type_shape with
-  | Ts_other -> fallback_die, "value"
-  | Ts_constr type_uid -> (
+  | Ts_other | Ts_var _ -> fallback_die, "value"
+  | Ts_constr (type_uid, shapes) -> (
     match Uid.Tbl.find_opt Type_shape.all_type_decls type_uid with
     | None | Some { definition = Tds_other; _ } -> fallback_die, "value"
-    | Some { path; definition = Tds_variant { constructors } } ->
-      let type_attribute =
-        [DAH.create_name (Path.name path); DAH.create_byte_size_exn ~byte_size:8]
+    | Some type_decl_shape -> (
+      let type_decl_shape =
+        Type_shape.Type_decl_shape.replace_tvar type_decl_shape shapes
       in
-      let enumeration_type =
-        Proto_die.create ~parent:(Some parent_proto_die)
-          ~attribute_values:type_attribute ~tag:Dwarf_tag.Enumeration_type ()
-      in
-      List.iteri
-        (fun i constructor ->
-          let enumerator_attributes =
-            [ DAH.create_name constructor;
-              DAH.create_const_value ~value:(Int64.of_int ((2 * i) + 1)) ]
-          in
-          Proto_die.create_ignore ~parent:(Some enumeration_type)
-            ~tag:Dwarf_tag.Enumerator ~attribute_values:enumerator_attributes ())
-        constructors;
-      enumeration_type, Path.name path)
+      match type_decl_shape.definition with
+      | Tds_other -> fallback_die, "value"
+      | Tds_variant { simple_constructors; complex_constructors } ->
+        let int_or_ptr_structure =
+          Proto_die.create ~parent:(Some parent_proto_die)
+            ~attribute_values:
+              [DAH.create_byte_size_exn ~byte_size:8; DAH.create_name "t"]
+            ~tag:Dwarf_tag.Structure_type ()
+        in
+        let variant_part =
+          Proto_die.create ~parent:(Some int_or_ptr_structure)
+            ~attribute_values:[] ~tag:Dwarf_tag.Variant_part ()
+        in
+        let int_or_ptr_enum =
+          Proto_die.create ~parent:(Some parent_proto_die)
+            ~tag:Dwarf_tag.Enumeration_type
+            ~attribute_values:
+              [ DAH.create_byte_size_exn ~byte_size:8;
+                DAH.create_bit_size (Int64.of_int 1)
+                (*DAH.create_encoding ~encoding:Encoding_attribute.unsigned;*)
+              ]
+            ()
+        in
+        List.iteri
+          (fun i name ->
+            Proto_die.create_ignore ~parent:(Some int_or_ptr_enum)
+              ~tag:Dwarf_tag.Enumerator
+              ~attribute_values:
+                [ DAH.create_name name;
+                  DAH.create_const_value ~value:(Int64.of_int i) ]
+              ())
+          ["Pointer"; "Immediate"];
+        (* CR tnowak: add comments that tell why the code is so messed up *)
+        let int_or_ptr_discr =
+          Proto_die.create ~parent:(Some variant_part)
+            ~attribute_values:
+              [ DAH.create_type ~proto_die:int_or_ptr_enum;
+                DAH.create_bit_size (Int64.of_int 1);
+                DAH.create_data_bit_offset
+                  ~bit_offset:(Numbers.Int8.of_int_exn 0);
+                DAH.create_data_member_location_offset
+                  ~byte_offset:(Int64.of_int 0) ]
+            ~tag:Dwarf_tag.Member ()
+        in
+        Proto_die.add_or_replace_attribute_value variant_part
+          (DAH.create_discr
+             ~proto_die_reference:(Proto_die.reference int_or_ptr_discr));
+        let int_case_variant =
+          Proto_die.create ~parent:(Some variant_part) ~tag:Dwarf_tag.Variant
+            ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int 1)]
+            ()
+        in
+        let simple_constructor_type =
+          Proto_die.create ~parent:(Some parent_proto_die)
+            ~tag:Dwarf_tag.Enumeration_type
+            ~attribute_values:
+              [ DAH.create_byte_size_exn ~byte_size:8;
+                DAH.create_bit_size (Int64.of_int 63) ]
+            ()
+        in
+        List.iteri
+          (fun i constructor ->
+            Proto_die.create_ignore ~parent:(Some simple_constructor_type)
+              ~tag:Dwarf_tag.Enumerator
+              ~attribute_values:
+                [ DAH.create_const_value ~value:(Int64.of_int i);
+                  DAH.create_name constructor ]
+              ())
+          simple_constructors;
+        Proto_die.create_ignore ~parent:(Some int_case_variant)
+          ~tag:Dwarf_tag.Member
+          ~attribute_values:
+            [ DAH.create_type ~proto_die:simple_constructor_type;
+              DAH.create_bit_size (Int64.of_int 63);
+              DAH.create_data_member_location_offset
+                ~byte_offset:(Int64.of_int 0);
+              DAH.create_data_bit_offset ~bit_offset:(Numbers.Int8.of_int_exn 1)
+            ]
+          ();
+        let ptr_case_variant =
+          Proto_die.create ~parent:(Some variant_part) ~tag:Dwarf_tag.Variant
+            ~attribute_values:[DAH.create_discr_value ~value:(Int64.of_int 0)]
+            ()
+        in
+        let max_field_count =
+          List.fold_left max 0
+            (List.map
+               (fun (_name, args) -> List.length args)
+               complex_constructors)
+        in
+        let ptr_case_structure =
+          Proto_die.create ~parent:(Some parent_proto_die)
+            ~tag:Dwarf_tag.Structure_type
+            ~attribute_values:
+              [DAH.create_byte_size_exn ~byte_size:(8 * (1 + max_field_count))]
+            ()
+        in
+        let ptr_case_pointer_to_structure =
+          Proto_die.create ~parent:(Some parent_proto_die)
+            ~tag:Dwarf_tag.Reference_type
+            ~attribute_values:
+              [ DAH.create_byte_size_exn ~byte_size:8;
+                DAH.create_type ~proto_die:ptr_case_structure;
+                DAH.create_address_class ~value:(Numbers.Int8.of_int_exn 42) ]
+            ()
+        in
+        Proto_die.create_ignore ~parent:(Some ptr_case_variant)
+          ~tag:Dwarf_tag.Member
+          ~attribute_values:
+            [ DAH.create_type ~proto_die:ptr_case_pointer_to_structure;
+              DAH.create_data_member_location_offset
+                ~byte_offset:(Int64.of_int 0) ]
+          ();
+        let ptr_case_variant_part =
+          Proto_die.create ~parent:(Some ptr_case_structure)
+            ~attribute_values:[] ~tag:Dwarf_tag.Variant_part ()
+        in
+        let ptr_case_enum =
+          Proto_die.create ~parent:(Some parent_proto_die)
+            ~tag:Dwarf_tag.Enumeration_type
+            ~attribute_values:[DAH.create_byte_size_exn ~byte_size:1]
+            ()
+        in
+        List.iteri
+          (fun i (name, constructors) ->
+            Proto_die.create_ignore ~parent:(Some ptr_case_enum)
+              ~tag:Dwarf_tag.Enumerator
+              ~attribute_values:
+                [ DAH.create_const_value ~value:(Int64.of_int i);
+                  DAH.create_name name ]
+              ())
+          complex_constructors;
+        let ptr_case_discr =
+          Proto_die.create ~parent:(Some ptr_case_variant_part)
+            ~attribute_values:
+              [ DAH.create_type ~proto_die:ptr_case_enum;
+                DAH.create_byte_size_exn ~byte_size:8;
+                DAH.create_data_member_location_offset
+                  ~byte_offset:(Int64.of_int 0) ]
+            ~tag:Dwarf_tag.Member ()
+        in
+        Proto_die.add_or_replace_attribute_value ptr_case_variant_part
+          (DAH.create_discr
+             ~proto_die_reference:(Proto_die.reference ptr_case_discr));
+        List.iteri
+          (fun i (name, constructors) ->
+            print_endline name;
+            let subvariant =
+              Proto_die.create ~parent:(Some ptr_case_variant_part)
+                ~tag:Dwarf_tag.Variant
+                ~attribute_values:
+                  [DAH.create_discr_value ~value:(Int64.of_int i)]
+                ()
+            in
+            let fields_structure =
+              Proto_die.create ~parent:(Some parent_proto_die)
+                ~tag:Dwarf_tag.Structure_type
+                ~attribute_values:
+                  [ DAH.create_byte_size_exn
+                      ~byte_size:(8 * (1 + List.length constructors)) ]
+                ()
+            in
+            List.iteri
+              (fun i shape ->
+                let field_type =
+                  match need_rvalue shape with
+                  | true ->
+                    Proto_die.create ~parent:(Some fields_structure)
+                      ~tag:Dwarf_tag.Reference_type
+                      ~attribute_values:
+                        [ DAH.create_byte_size_exn ~byte_size:8;
+                          DAH.create_type
+                            ~proto_die:
+                              (type_shape_to_die shape ~parent_proto_die
+                                 ~fallback_die
+                              |> fst) ]
+                      ()
+                  | false ->
+                    type_shape_to_die shape ~parent_proto_die ~fallback_die
+                    |> fst
+                in
+                Proto_die.create_ignore ~parent:(Some fields_structure)
+                  ~tag:Dwarf_tag.Member
+                  ~attribute_values:
+                    [ DAH.create_data_member_location_offset
+                        ~byte_offset:(Int64.of_int (8 * (1 + i)));
+                      DAH.create_byte_size_exn ~byte_size:8;
+                      DAH.create_type ~proto_die:field_type ]
+                  ())
+              constructors;
+            Proto_die.create_ignore ~parent:(Some subvariant)
+              ~tag:Dwarf_tag.Member
+              ~attribute_values:[DAH.create_type ~proto_die:fields_structure]
+              ())
+          complex_constructors;
+        (* let type_attribute = [DAH.create_name (Path.name path);
+           DAH.create_byte_size_exn ~byte_size:8] in let enumeration_type =
+           Proto_die.create ~parent:(Some parent_proto_die)
+           ~attribute_values:type_attribute ~tag:Dwarf_tag.Enumeration_type ()
+           in List.iteri (fun i constructor -> let enumerator_attributes = [
+           DAH.create_name constructor; DAH.create_const_value
+           ~value:(Int64.of_int ((2 * i) + 1)) ] in Proto_die.create_ignore
+           ~parent:(Some enumeration_type) ~tag:Dwarf_tag.Enumerator
+           ~attribute_values:enumerator_attributes ()) constructors;
+           enumeration_type, Path.name path) *)
+        int_or_ptr_structure, Path.name type_decl_shape.path))
   | Ts_tuple shapes ->
     let structure_attributes =
       [DAH.create_byte_size_exn ~byte_size:(List.length shapes * 8)]

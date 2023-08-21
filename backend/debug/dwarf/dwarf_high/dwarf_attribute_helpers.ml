@@ -259,6 +259,11 @@ let create_sibling ~proto_die = reference_proto_die Sibling proto_die
 
 let create_import ~proto_die = reference_proto_die Import proto_die
 
+let create_discr ~proto_die_reference:label =
+  let spec = AS.create Discr Ref_addr in
+  AV.create spec
+    (V.offset_into_debug_info ~comment:"reference to discriminant DIE" label)
+
 let create_type_from_reference ~proto_die_reference:label =
   let spec = AS.create Type Ref_addr in
   AV.create spec
@@ -281,6 +286,10 @@ let create_data_member_location_description loc_desc =
   let spec = AS.create Data_member_location Exprloc in
   AV.create spec (V.single_location_description loc_desc)
 
+let create_data_bit_offset ~bit_offset =
+  let spec = AS.create Data_bit_offset Data1 in
+  AV.create spec (V.int8 ~comment:"data bit offset" bit_offset)
+
 let create_linkage_name ~linkage_name =
   let spec = AS.create Linkage_name Strp in
   AV.create spec (V.indirect_string ~comment:"linkage name" linkage_name)
@@ -299,9 +308,17 @@ let create_const_value_from_symbol ~symbol =
     AV.create spec (V.symbol_64 symbol)
   | size -> Misc.fatal_errorf "Unknown Targetint.size %d" size
 
+let create_discr_value ~value =
+  let spec = AS.create Discr_value Data8 in
+  AV.create spec (V.int64 value)
+
 let create_addr_base label =
   let spec = AS.create Addr_base Sec_offset_addrptr in
   AV.create spec (V.offset_into_debug_addr label)
+
+let create_address_class ~value =
+  let spec = AS.create Address_class Data1 in
+  AV.create spec (V.int8 value)
 
 let create_loclists_base label =
   let spec = AS.create Loclists_base Sec_offset_loclistsptr in

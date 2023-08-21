@@ -45,6 +45,8 @@ val signed_int_const : Targetint.t -> Dwarf_operator.t
 
 val add_unsigned_const : Targetint.t -> Dwarf_operator.t list
 
+val add_signed_const : Targetint.t -> Dwarf_operator.t list
+
 val float_const : Int64.t -> Dwarf_operator.t
 
 val implicit_pointer :

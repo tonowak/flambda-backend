@@ -305,10 +305,6 @@ let common_initial_env add_type add_extension empty_env =
        [| Layout.value ~why:Tuple |]
 
 let build_initial_env add_type add_exception empty_env =
-  let add_type (type_ident : Ident.t) decl env =
-    Type_shape.add_to_type_decls (Pident type_ident) decl;
-    add_type type_ident decl env
-  in
   let common = common_initial_env add_type add_exception empty_env in
   let add_type = mk_add_type add_type in
   let safe_string = add_type ident_bytes common in
