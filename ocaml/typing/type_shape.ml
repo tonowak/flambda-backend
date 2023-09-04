@@ -4,7 +4,7 @@ module Type_shape = struct
   type t =
     | Ts_constr of Uid.t * t list
     | Ts_tuple of t list
-    | Ts_var of string
+    | Ts_var of string option
     | Ts_other
   (* | Ttyp_var of string option * const_layout option | Ttyp_arrow of arg_label
      * core_type * core_type | Ttyp_tuple of core_type list | Ttyp_object of
@@ -23,8 +23,9 @@ module Type_shape = struct
     | Tconstr (path, constrs, _abbrev_memo) ->
       Ts_constr (uid_of_path path, map_expr_list constrs)
     | Ttuple exprs -> Ts_tuple (map_expr_list exprs)
-    | Tvar { name; layout = _ } -> (
-      match name with Some name -> Ts_var name | _ -> Ts_other)
+    | Tvar { name; layout = _ } -> Ts_var name
+    | Tpoly (type_expr, []) ->
+      of_type_desc (Types.get_desc type_expr) uid_of_path
     | _ -> Ts_other
 
   let rec print ppf = function
@@ -41,18 +42,27 @@ module Type_shape = struct
            print)
         shapes
     | Ts_var name ->
-      Format.fprintf ppf "Ts_var (%a)" Format.pp_print_string name
+      Format.fprintf ppf "Ts_var (%a)"
+        (fun ppf opt -> Format.pp_print_option Format.pp_print_string ppf opt)
+        name
     | Ts_other -> Format.fprintf ppf "Ts_other"
 
-  module StringMap = Map.Make (String)
-
-  let rec replace_tvar t ~(map : t StringMap.t) =
-    match t with
-    | Ts_constr (uid, shape_list) ->
-      Ts_constr (uid, List.map (replace_tvar ~map) shape_list)
-    | Ts_tuple shape_list -> Ts_tuple (List.map (replace_tvar ~map) shape_list)
-    | Ts_var name -> StringMap.find name map
-    | Ts_other -> Ts_other
+  let rec replace_tvar t ~(pairs : (t * t) list) =
+    match
+      List.filter_map
+        (fun (from, to_) ->
+          match t = from with true -> Some to_ | false -> None)
+        pairs
+    with
+    | new_type :: _ -> new_type
+    | [] -> (
+      match t with
+      | Ts_constr (uid, shape_list) ->
+        Ts_constr (uid, List.map (replace_tvar ~pairs) shape_list)
+      | Ts_tuple shape_list ->
+        Ts_tuple (List.map (replace_tvar ~pairs) shape_list)
+      | Ts_var name -> Ts_var name
+      | Ts_other -> Ts_other)
 end
 
 module Type_decl_shape = struct
@@ -140,21 +150,6 @@ module Type_decl_shape = struct
       shapes
       (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
       t.type_params;
-    let type_params =
-      List.map
-        (fun (type_shape : Type_shape.t) ->
-          match type_shape with
-          | Ts_constr _ | Ts_tuple _ | Ts_other -> "TODO throw"
-          | Ts_var name -> name)
-        t.type_params
-    in
-    Format.eprintf "type_params %a\n%!"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_string)
-      type_params;
-    let map =
-      List.combine type_params shapes
-      |> List.to_seq |> Type_shape.StringMap.of_seq
-    in
     { type_params = [];
       path = t.path;
       compilation_unit = t.compilation_unit;
@@ -166,7 +161,11 @@ module Type_decl_shape = struct
               complex_constructors =
                 List.map
                   (fun (name, shape_list) ->
-                    name, List.map (Type_shape.replace_tvar ~map) shape_list)
+                    ( name,
+                      List.map
+                        (Type_shape.replace_tvar
+                           ~pairs:(List.combine t.type_params shapes))
+                        shape_list ))
                   complex_constructors
             }
         | Tds_other -> Tds_other)

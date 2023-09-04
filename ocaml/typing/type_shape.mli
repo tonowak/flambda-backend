@@ -4,7 +4,7 @@ module Type_shape : sig
   type t =
     | Ts_constr of Shape.Uid.t * t list
     | Ts_tuple of t list
-    | Ts_var of string
+    | Ts_var of string option
     | Ts_other
 
   (* | Ttyp_var of string option * const_layout option | Ttyp_arrow of arg_label
