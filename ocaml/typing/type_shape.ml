@@ -104,6 +104,17 @@ module Type_shape = struct
       | Ts_var name -> Ts_var name
       | Ts_predef predef -> Ts_predef predef
       | Ts_other -> Ts_other)
+
+  include Identifiable.Make(
+    struct
+      type nonrec t = t
+        let compare = Stdlib.compare
+        let print = print
+        let hash = Hashtbl.hash
+        let equal (x : t) y = x = y
+        let output _oc _t = Misc.fatal_error "unimplemented"
+    end
+    )
 end
 
 module Type_decl_shape = struct
@@ -234,7 +245,7 @@ let tuple_to_string (strings : string list) =
   match strings with
   | [] -> ""
   | hd :: [] -> hd
-  | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ")"
+  | _ :: _ :: _ -> "(" ^ String.concat " * " strings ^ ")"
 
 let rec type_name (type_shape : Type_shape.t) =
   match type_shape with

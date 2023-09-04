@@ -22,7 +22,7 @@ module Type_shape : sig
     | Ts_predef of predef
     | Ts_other
 
-  val print : Format.formatter -> t -> unit
+  include Identifiable.S with type t := t
 end
 
 module Type_decl_shape : sig

@@ -3,7 +3,7 @@ open! Dwarf_high
 module Uid = Shape.Uid
 
 type result = private
-  { die : Proto_die.t;
+  { die_reference : Proto_die.reference;
     need_rvalue : bool
   }
 

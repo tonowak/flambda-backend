@@ -162,12 +162,12 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
       let proto_die_reference, need_rvalue =
         match provenance with
         | Some provenance ->
-          let { Dwarf_type.die; need_rvalue } =
+          let { Dwarf_type.die_reference; need_rvalue } =
             Dwarf_type.variant_for_var state
               (Backend_var.Provenance.uid provenance)
               ~parent_proto_die
           in
-          Proto_die.reference die, need_rvalue
+          die_reference, need_rvalue
         | None -> Proto_die.reference (DS.value_type_proto_die state), false
       in
       let type_attribute =
