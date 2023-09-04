@@ -65,6 +65,7 @@ module Type_decl_shape = struct
 
   type t =
     { path : Path.t;
+      compilation_unit : Compilation_unit.t option;
       definition : tds;
       type_params : Type_shape.t list
     }
@@ -87,8 +88,8 @@ module Type_decl_shape = struct
     in
     length == 0
 
-  let of_type_declaration path (type_declaration : Types.type_declaration)
-      uid_of_path =
+  let of_type_declaration compilation_unit path
+      (type_declaration : Types.type_declaration) uid_of_path =
     let definition =
       match type_declaration.type_kind with
       | Type_variant (cstr_list, _variant_repr) ->
@@ -110,7 +111,7 @@ module Type_decl_shape = struct
           Type_shape.of_type_desc (Types.get_desc type_expr) uid_of_path)
         type_declaration.type_params
     in
-    { path; definition; type_params }
+    { path; definition; type_params; compilation_unit }
 
   let print_complex_constructor ppf (name, constructors) =
     Format.fprintf ppf "(%a: %a)" Format.pp_print_string name
@@ -156,6 +157,7 @@ module Type_decl_shape = struct
     in
     { type_params = [];
       path = t.path;
+      compilation_unit = t.compilation_unit;
       definition =
         (match t.definition with
         | Tds_variant { simple_constructors; complex_constructors } ->
@@ -178,7 +180,9 @@ let all_type_shapes = Uid.Tbl.create 42
 let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   let uid = type_decl.type_uid in
   let type_decl_shape =
-    Type_decl_shape.of_type_declaration path type_decl uid_of_path
+    Type_decl_shape.of_type_declaration
+      (Compilation_unit.get_current ())
+      path type_decl uid_of_path
   in
   Uid.Tbl.add all_type_decls uid type_decl_shape
 

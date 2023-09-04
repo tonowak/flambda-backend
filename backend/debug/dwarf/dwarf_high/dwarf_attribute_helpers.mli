@@ -191,3 +191,6 @@ val create_ocaml_linker_dirs :
 
 val create_ocaml_cmt_file_digest :
   Digest.t -> Dwarf_attribute_values.Attribute_value.t
+
+val create_ocaml_offset_record_from_pointer :
+  value:Int64.t -> Dwarf_attribute_values.Attribute_value.t

@@ -27,6 +27,7 @@ module Type_decl_shape : sig
 
   type t =
     { path : Path.t;
+      compilation_unit : Compilation_unit.t option;
       definition : tds;
       type_params : Type_shape.t list
     }
