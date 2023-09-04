@@ -1,19 +1,27 @@
 module Uid = Shape.Uid
 
 module Type_shape : sig
+  type predef =
+    | String
+    | Bytes
+    | Float
+    | Nativeint
+    | Int32
+    | Int64
+    | Floatarray
+    | Int
+    | Char
+    | Unboxed_float
+    | Lazy_t
+    | Extension_constructor
+
   type t =
     | Ts_constr of Shape.Uid.t * t list
     | Ts_tuple of t list
     | Ts_var of string option
+    | Ts_predef of predef
     | Ts_other
 
-  (* | Ttyp_var of string option * const_layout option | Ttyp_arrow of arg_label
-   * core_type * core_type | Ttyp_tuple of core_type list | Ttyp_object of
-     object_field list * closed_flag | Ttyp_class of Path.t * Longident.t loc *
-     core_type list | Ttyp_alias of core_type * string option * const_layout
-     option | Ttyp_variant of row_field list * closed_flag * label list option |
-     Ttyp_poly of (string * const_layout option) list * core_type | Ttyp_package
-     of package_type *)
   val print : Format.formatter -> t -> unit
 end
 
@@ -46,3 +54,5 @@ val add_to_type_decls :
   Path.t -> Types.type_declaration -> (Path.t -> Uid.t) -> unit
 
 val add_to_type_shapes : Uid.t -> Types.type_desc -> (Path.t -> Uid.t) -> unit
+
+val type_name : Type_shape.t -> string

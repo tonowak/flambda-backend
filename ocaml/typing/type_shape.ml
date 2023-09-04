@@ -1,18 +1,55 @@
 module Uid = Shape.Uid
 
 module Type_shape = struct
+  type predef =
+    | String
+    | Bytes
+    | Float
+    | Nativeint
+    | Int32
+    | Int64
+    | Floatarray
+    | Int
+    | Char
+    | Unboxed_float
+    | Lazy_t
+    | Extension_constructor
+
+  let predef_to_string = function
+    | String -> "string"
+    | Bytes -> "bytes"
+    | Float -> "float"
+    | Nativeint -> "nativeint"
+    | Int32 -> "int32"
+    | Int64 -> "int64"
+    | Floatarray -> "floatarray"
+    | Int -> "int"
+    | Char -> "char"
+    | Unboxed_float -> "float#"
+    | Lazy_t -> "lazy_t"
+    | Extension_constructor -> "extension_constructor"
+
+  let predef_of_string = function
+    | "string" -> Some String
+    | "bytes" -> Some Bytes
+    | "float" -> Some Float
+    | "nativeint" -> Some Nativeint
+    | "int32" -> Some Int32
+    | "int64" -> Some Int64
+    | "floatarray" -> Some Floatarray
+    | "int" -> Some Int
+    | "char" -> Some Char
+    | "float#" -> Some Unboxed_float
+    | "lazy_t" -> Some Lazy_t
+    | "extension_constructor" -> Some Extension_constructor
+    | _ -> None
+
   type t =
     | Ts_constr of Uid.t * t list
     | Ts_tuple of t list
     | Ts_var of string option
+    | Ts_predef of predef
     | Ts_other
-  (* | Ttyp_var of string option * const_layout option | Ttyp_arrow of arg_label
-     * core_type * core_type | Ttyp_tuple of core_type list | Ttyp_object of
-     object_field list * closed_flag | Ttyp_class of Path.t * Longident.t loc *
-     core_type list | Ttyp_alias of core_type * string option * const_layout
-     option | Ttyp_variant of row_field list * closed_flag * label list option |
-     Ttyp_poly of (string * const_layout option) list * core_type | Ttyp_package
-     of package_type *)
 
   let rec of_type_desc (desc : Types.type_desc) uid_of_path =
     let expr_to_t expr = of_type_desc (Types.get_desc expr) uid_of_path in
@@ -20,8 +57,10 @@ module Type_shape = struct
       List.map expr_to_t exprs
     in
     match desc with
-    | Tconstr (path, constrs, _abbrev_memo) ->
-      Ts_constr (uid_of_path path, map_expr_list constrs)
+    | Tconstr (path, constrs, _abbrev_memo) -> (
+      match predef_of_string (Path.name path) with
+      | Some predef -> Ts_predef predef
+      | None -> Ts_constr (uid_of_path path, map_expr_list constrs))
     | Ttuple exprs -> Ts_tuple (map_expr_list exprs)
     | Tvar { name; layout = _ } -> Ts_var name
     | Tpoly (type_expr, []) ->
@@ -29,6 +68,7 @@ module Type_shape = struct
     | _ -> Ts_other
 
   let rec print ppf = function
+    | Ts_predef predef -> Format.pp_print_string ppf (predef_to_string predef)
     | Ts_constr (uid, shapes) ->
       Format.fprintf ppf "Ts_constr uid=%a (%a)" Uid.print uid
         (Format.pp_print_list
@@ -62,6 +102,7 @@ module Type_shape = struct
       | Ts_tuple shape_list ->
         Ts_tuple (List.map (replace_tvar ~pairs) shape_list)
       | Ts_var name -> Ts_var name
+      | Ts_predef predef -> Ts_predef predef
       | Ts_other -> Ts_other)
 end
 
@@ -172,9 +213,9 @@ module Type_decl_shape = struct
     }
 end
 
-let all_type_decls = Uid.Tbl.create 42
+let (all_type_decls : Type_decl_shape.t Uid.Tbl.t) = Uid.Tbl.create 42
 
-let all_type_shapes = Uid.Tbl.create 42
+let (all_type_shapes : Type_shape.t Uid.Tbl.t) = Uid.Tbl.create 42
 
 let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   let uid = type_decl.type_uid in
@@ -188,3 +229,31 @@ let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
 let add_to_type_shapes var_uid type_desc uid_of_path =
   let type_shape = Type_shape.of_type_desc type_desc uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid type_shape
+
+let tuple_to_string (strings : string list) =
+  match strings with
+  | [] -> ""
+  | hd :: [] -> hd
+  | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ")"
+
+let rec type_name (type_shape : Type_shape.t) =
+  match type_shape with
+  | Ts_predef predef -> Type_shape.predef_to_string predef
+  | Ts_other -> "unknown"
+  | Ts_tuple shapes -> tuple_to_string (List.map type_name shapes)
+  | Ts_var name -> "'" ^ Option.value name ~default:"?"
+  | Ts_constr (type_uid, shapes) -> (
+    match Uid.Tbl.find_opt all_type_decls type_uid with
+    | None | Some { definition = Tds_other; _ } -> "unknown"
+    | Some type_decl_shape ->
+      let args = tuple_to_string (List.map type_name shapes) in
+      let args = match args with "" -> args | _ -> args ^ " " in
+      let compilation_unit_name =
+        type_decl_shape.compilation_unit
+        |> Option.map (fun x -> Compilation_unit.full_path_as_string x ^ ".")
+        |> Option.value ~default:""
+      in
+      let name_with_compilation_unit =
+        compilation_unit_name ^ Path.name type_decl_shape.path
+      in
+      args ^ name_with_compilation_unit)
