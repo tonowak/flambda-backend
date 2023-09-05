@@ -359,6 +359,14 @@ let create_declaration () =
   AV.create spec
     (V.flag_true ~comment:"incomplete / non-defining declaration" ())
 
+let create_byte_stride ~bytes =
+  let spec = AS.create Byte_stride Data1 in
+  AV.create spec (V.int8 bytes)
+
+let create_count loc_desc =
+  let spec = AS.create Count Exprloc in
+  AV.create spec (V.single_location_description loc_desc)
+
 let create_ocaml_compiler_version version =
   let spec = AS.create (Ocaml_specific Compiler_version) Strp in
   AV.create spec (V.indirect_string ~comment:"OCaml compiler version" version)

@@ -8,6 +8,7 @@ module Type_shape = struct
     | Nativeint
     | Int32
     | Int64
+    | Array
     | Floatarray
     | Int
     | Char
@@ -22,6 +23,7 @@ module Type_shape = struct
     | Nativeint -> "nativeint"
     | Int32 -> "int32"
     | Int64 -> "int64"
+    | Array -> "array"
     | Floatarray -> "floatarray"
     | Int -> "int"
     | Char -> "char"
@@ -36,6 +38,7 @@ module Type_shape = struct
     | "nativeint" -> Some Nativeint
     | "int32" -> Some Int32
     | "int64" -> Some Int64
+    | "array" -> Some Array
     | "floatarray" -> Some Floatarray
     | "int" -> Some Int
     | "char" -> Some Char
@@ -48,7 +51,7 @@ module Type_shape = struct
     | Ts_constr of Uid.t * t list
     | Ts_tuple of t list
     | Ts_var of string option
-    | Ts_predef of predef
+    | Ts_predef of predef * t list
     | Ts_other
 
   let rec of_type_desc (desc : Types.type_desc) uid_of_path =
@@ -59,7 +62,7 @@ module Type_shape = struct
     match desc with
     | Tconstr (path, constrs, _abbrev_memo) -> (
       match predef_of_string (Path.name path) with
-      | Some predef -> Ts_predef predef
+      | Some predef -> Ts_predef (predef, map_expr_list constrs)
       | None -> Ts_constr (uid_of_path path, map_expr_list constrs))
     | Ttuple exprs -> Ts_tuple (map_expr_list exprs)
     | Tvar { name; layout = _ } -> Ts_var name
@@ -68,7 +71,12 @@ module Type_shape = struct
     | _ -> Ts_other
 
   let rec print ppf = function
-    | Ts_predef predef -> Format.pp_print_string ppf (predef_to_string predef)
+    | Ts_predef (predef, shapes) ->
+      Format.fprintf ppf "%s (%a)" (predef_to_string predef)
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
+           print)
+        shapes
     | Ts_constr (uid, shapes) ->
       Format.fprintf ppf "Ts_constr uid=%a (%a)" Uid.print uid
         (Format.pp_print_list
@@ -102,7 +110,7 @@ module Type_shape = struct
       | Ts_tuple shape_list ->
         Ts_tuple (List.map (replace_tvar ~pairs) shape_list)
       | Ts_var name -> Ts_var name
-      | Ts_predef predef -> Ts_predef predef
+      | Ts_predef (predef, shape_list) -> Ts_predef (predef, shape_list)
       | Ts_other -> Ts_other)
 
   include Identifiable.Make(
@@ -247,9 +255,17 @@ let tuple_to_string (strings : string list) =
   | hd :: [] -> hd
   | _ :: _ :: _ -> "(" ^ String.concat " * " strings ^ ")"
 
+let shapes_to_string (strings : string list) =
+  match strings with
+  | [] -> ""
+  | hd :: [] -> hd ^ " "
+  | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ") "
+
 let rec type_name (type_shape : Type_shape.t) =
   match type_shape with
-  | Ts_predef predef -> Type_shape.predef_to_string predef
+  | Ts_predef (predef, shapes) ->
+    let shapes = shapes_to_string (List.map type_name shapes) in
+    shapes ^ (Type_shape.predef_to_string predef)
   | Ts_other -> "unknown"
   | Ts_tuple shapes -> tuple_to_string (List.map type_name shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
@@ -257,7 +273,7 @@ let rec type_name (type_shape : Type_shape.t) =
     match Uid.Tbl.find_opt all_type_decls type_uid with
     | None | Some { definition = Tds_other; _ } -> "unknown"
     | Some type_decl_shape ->
-      let args = tuple_to_string (List.map type_name shapes) in
+      let args = shapes_to_string (List.map type_name shapes) in
       let args = match args with "" -> args | _ -> args ^ " " in
       let compilation_unit_name =
         type_decl_shape.compilation_unit
