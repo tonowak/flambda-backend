@@ -171,10 +171,11 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
                     DAH.create_data_bit_offset
                       ~bit_offset:(Numbers.Int8.of_int_exn 0);
                     DAH.create_data_member_location_offset
-                      ~byte_offset:(Int64.of_int 0) ]
-                  (*[ DAH.create_type ~proto_die:fallback_die;
-                    DAH.create_data_member_location_offset
-                    ~byte_offset:(Int64.of_int 0)]*)
+                      ~byte_offset:(Int64.of_int 0);
+                    (* Making a member artificial will mark the struct as
+                       artificial, which will not print the enum name when the
+                       struct is a variant. *)
+                    DAH.create_artificial () ]
                 ~tag:Dwarf_tag.Member ()
             in
             Proto_die.add_or_replace_attribute_value variant_part
