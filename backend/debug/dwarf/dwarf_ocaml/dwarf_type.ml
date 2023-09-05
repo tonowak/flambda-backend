@@ -18,8 +18,7 @@ let need_rvalue (type_shape : Type_shape.Type_shape.t) =
 let array_type ~parent_proto_die ~array_type_reference ~array_type_shape
     ~element_type_reference ~cache ~fallback_die =
   let array_type_die =
-    Proto_die.create ~reference:array_type_reference
-      ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Array_type
+    Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Array_type
       ~attribute_values:
         [ DAH.create_name (Type_shape.type_name array_type_shape);
           DAH.create_type_from_reference
@@ -44,6 +43,12 @@ let array_type ~parent_proto_die ~array_type_reference ~array_type_shape
     ~attribute_values:
       [ (* Thankfully, all that lldb cares about is DW_AT_count. *)
         DAH.create_count_const 0L (* DAH.create_count get_num_elements *) ]
+    ();
+  Proto_die.create_ignore ~reference:array_type_reference
+    ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Reference_type
+    ~attribute_values:
+      [ DAH.create_byte_size_exn ~byte_size:8;
+        DAH.create_type ~proto_die:array_type_die ]
     ();
   array_type_reference
 
