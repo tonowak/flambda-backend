@@ -22,6 +22,17 @@ let rec need_rvalue (type_shape : Type_shape.Type_shape.t) =
   | Ts_predef _ -> false
   | Ts_other -> false
 
+let create_inlined_float ~parent_proto_die () =
+  let proto_die =
+    Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Base_type
+      ~attribute_values:
+        [ DAH.create_name "inlined float";
+          DAH.create_byte_size_exn ~byte_size:8;
+          DAH.create_encoding ~encoding:Encoding_attribute.float ]
+      ()
+  in
+  Proto_die.reference proto_die
+
 let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     ~parent_proto_die ~fallback_die
     ~(cache : Proto_die.reference Type_shape.Type_shape.Tbl.t) =
@@ -71,6 +82,14 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
                   DAH.create_name (Type_shape.type_name type_shape) ]
               ()
           in
+          let is_record_float =
+            List.for_all
+              (fun (_field_name, type_shape) ->
+                match type_shape with
+                | Type_shape.Type_shape.Ts_predef Float -> true
+                | _ -> false)
+              field_list
+          in
           List.iteri
             (fun i (field_name, type_shape) ->
               Proto_die.create_ignore ~parent:(Some structure)
@@ -79,8 +98,12 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
                   [ DAH.create_name field_name;
                     DAH.create_type_from_reference
                       ~proto_die_reference:
-                        (create_wrapper_if_need_rvalue type_shape
-                           ~parent_proto_die:structure ~fallback_die ~cache);
+                        (match is_record_float with
+                        | false ->
+                          create_wrapper_if_need_rvalue type_shape
+                            ~parent_proto_die:structure ~fallback_die ~cache
+                        | true ->
+                          create_inlined_float ~parent_proto_die:structure ());
                     DAH.create_data_member_location_offset
                       ~byte_offset:(Int64.of_int (8 * i)) ]
                 ())
