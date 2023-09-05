@@ -105,24 +105,30 @@ module Type_shape = struct
       | Ts_predef predef -> Ts_predef predef
       | Ts_other -> Ts_other)
 
-  include Identifiable.Make(
-    struct
-      type nonrec t = t
-        let compare = Stdlib.compare
-        let print = print
-        let hash = Hashtbl.hash
-        let equal (x : t) y = x = y
-        let output _oc _t = Misc.fatal_error "unimplemented"
-    end
-    )
+  include Identifiable.Make (struct
+    type nonrec t = t
+
+    let compare = Stdlib.compare
+
+    let print = print
+
+    let hash = Hashtbl.hash
+
+    let equal (x : t) y = x = y
+
+    let output _oc _t = Misc.fatal_error "unimplemented"
+  end)
 end
 
 module Type_decl_shape = struct
   type tds =
     | Tds_variant of
         { simple_constructors : string list;
-          complex_constructors : (string * Type_shape.t list) list
+          complex_constructors :
+            (string * (string option * Type_shape.t) list) list
         }
+    | Tds_record of (string * Type_shape.t) list
+    | Tds_alias of Type_shape.t
     | Tds_other
 
   type t =
@@ -132,15 +138,20 @@ module Type_decl_shape = struct
       type_params : Type_shape.t list
     }
 
-  let tuple_constructors (cstr_args : Types.constructor_declaration) uid_of_path
-      =
+  let get_variant_constructors (cstr_args : Types.constructor_declaration)
+      uid_of_path =
     match cstr_args.cd_args with
     | Cstr_tuple list ->
       List.map
         (fun (type_expr, _flag) ->
-          Type_shape.of_type_desc (Types.get_desc type_expr) uid_of_path)
+          None, Type_shape.of_type_desc (Types.get_desc type_expr) uid_of_path)
         list
-    | Cstr_record _list -> []
+    | Cstr_record list ->
+      List.map
+        (fun (lbl : Types.label_declaration) ->
+          ( Some (Ident.name lbl.ld_id),
+            Type_shape.of_type_desc (Types.get_desc lbl.ld_type) uid_of_path ))
+        list
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
     let length =
@@ -153,19 +164,37 @@ module Type_decl_shape = struct
   let of_type_declaration compilation_unit path
       (type_declaration : Types.type_declaration) uid_of_path =
     let definition =
-      match type_declaration.type_kind with
-      | Type_variant (cstr_list, _variant_repr) ->
-        let simple_constructors, complex_constructors =
-          List.partition_map
-            (fun (cstr : Types.constructor_declaration) ->
-              let name = Ident.name cstr.cd_id in
-              match is_empty_constructor_list cstr with
-              | true -> Left name
-              | false -> Right (name, tuple_constructors cstr uid_of_path))
-            cstr_list
-        in
-        Tds_variant { simple_constructors; complex_constructors }
-      | Type_record _ | Type_abstract | Type_open -> Tds_other
+      match type_declaration.type_manifest with
+      | Some type_expr ->
+        Tds_alias
+          (Type_shape.of_type_desc (Types.get_desc type_expr) uid_of_path)
+      | None -> (
+        match type_declaration.type_kind with
+        | Type_variant (cstr_list, _variant_repr) ->
+          let simple_constructors, complex_constructors =
+            List.partition_map
+              (fun (cstr : Types.constructor_declaration) ->
+                let name = Ident.name cstr.cd_id in
+                match is_empty_constructor_list cstr with
+                | true -> Left name
+                | false ->
+                  Right (name, get_variant_constructors cstr uid_of_path))
+              cstr_list
+          in
+          Tds_variant { simple_constructors; complex_constructors }
+        | Type_record (lbl_list, record_repr) -> (
+          match record_repr with
+          | Record_boxed _ | Record_float ->
+            Tds_record
+              (List.map
+                 (fun (lbl : Types.label_declaration) ->
+                   ( Ident.name lbl.ld_id,
+                     Type_shape.of_type_desc
+                       (Types.get_desc lbl.ld_type)
+                       uid_of_path ))
+                 lbl_list)
+          | Record_inlined _ | Record_unboxed -> Tds_other)
+        | Type_abstract | Type_open -> Tds_other)
     in
     let type_params =
       List.map
@@ -175,10 +204,21 @@ module Type_decl_shape = struct
     in
     { path; definition; type_params; compilation_unit }
 
+  let print_one_constructor ppf (name, type_shape) =
+    match name with
+    | Some name ->
+      Format.fprintf ppf "%a=%a" Format.pp_print_string name Type_shape.print
+        type_shape
+    | None -> Format.fprintf ppf "%a" Type_shape.print type_shape
+
   let print_complex_constructor ppf (name, constructors) =
     Format.fprintf ppf "(%a: %a)" Format.pp_print_string name
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
+      (Format.pp_print_list ~pp_sep:Format.pp_print_space print_one_constructor)
       constructors
+
+  let print_field ppf (name, shape) =
+    Format.fprintf ppf "(%a: %a)" Format.pp_print_string name Type_shape.print
+      shape
 
   let print_tds ppf = function
     | Tds_variant { simple_constructors; complex_constructors } ->
@@ -190,6 +230,12 @@ module Type_decl_shape = struct
         (Format.pp_print_list ~pp_sep:Format.pp_print_space
            print_complex_constructor)
         complex_constructors
+    | Tds_record field_list ->
+      Format.fprintf ppf "Tds_record fields=%a"
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space print_field)
+        field_list
+    | Tds_alias type_shape ->
+      Format.fprintf ppf "Tds_alias %a" Type_shape.print type_shape
     | Tds_other -> Format.fprintf ppf "Tds_other"
 
   let print ppf t =
@@ -202,6 +248,9 @@ module Type_decl_shape = struct
       shapes
       (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
       t.type_params;
+    let replace_tvar =
+      Type_shape.replace_tvar ~pairs:(List.combine t.type_params shapes)
+    in
     { type_params = [];
       path = t.path;
       compilation_unit = t.compilation_unit;
@@ -215,11 +264,16 @@ module Type_decl_shape = struct
                   (fun (name, shape_list) ->
                     ( name,
                       List.map
-                        (Type_shape.replace_tvar
-                           ~pairs:(List.combine t.type_params shapes))
+                        (fun (name, shape) -> name, replace_tvar shape)
                         shape_list ))
                   complex_constructors
             }
+        | Tds_record field_list ->
+          Tds_record
+            (List.map
+               (fun (name, shape) -> name, replace_tvar shape)
+               field_list)
+        | Tds_alias type_shape -> Tds_alias (replace_tvar type_shape)
         | Tds_other -> Tds_other)
     }
 end

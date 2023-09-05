@@ -29,8 +29,11 @@ module Type_decl_shape : sig
   type tds =
     | Tds_variant of
         { simple_constructors : string list;
-          complex_constructors : (string * Type_shape.t list) list
+          complex_constructors :
+            (string * (string option * Type_shape.t) list) list
         }
+    | Tds_record of (string * Type_shape.t) list
+    | Tds_alias of Type_shape.t
     | Tds_other
 
   type t =
