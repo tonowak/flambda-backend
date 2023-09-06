@@ -45,13 +45,31 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     match type_shape with
     | Ts_other | Ts_var _ -> fallback_die
     | Ts_predef predef ->
-      Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
-        ~tag:Dwarf_tag.Typedef
-        ~attribute_values:
-          [ DAH.create_name (Type_shape.type_name type_shape);
-            DAH.create_type_from_reference ~proto_die_reference:fallback_die ]
-        ();
-      reference
+      (match predef with
+      | Char ->
+        let enum = Proto_die.create ~reference ~parent:(Some parent_proto_die)
+                          ~tag:Dwarf_tag.Enumeration_type
+                          ~attribute_values:[
+                            DAH.create_name "char";
+                            DAH.create_byte_size_exn ~byte_size:8
+                          ] () in
+        List.iter (fun i ->
+          Proto_die.create_ignore ~parent:(Some enum)
+            ~tag:Dwarf_tag.Enumerator
+            ~attribute_values:[
+              DAH.create_const_value ~value:(Int64.of_int (2 * i + 1));
+              DAH.create_name (if i = 0 then "\\0" else String.make 1 (Char.chr i))
+            ] ()
+        ) (List.init 255 (fun i -> i));
+        reference
+      | _ ->
+        Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
+          ~tag:Dwarf_tag.Typedef
+          ~attribute_values:
+            [ DAH.create_name (Type_shape.type_name type_shape);
+              DAH.create_type_from_reference ~proto_die_reference:fallback_die ]
+          ();
+        reference)
     | Ts_constr (type_uid, shapes) -> (
       match Uid.Tbl.find_opt Type_shape.all_type_decls type_uid with
       | None | Some { definition = Tds_other; _ } -> fallback_die
