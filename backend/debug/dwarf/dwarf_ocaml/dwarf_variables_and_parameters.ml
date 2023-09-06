@@ -67,9 +67,7 @@ type location_description =
   | Composite of Composite_location_description.t
 
 let reg_location_description reg ~offset : location_description option =
-  match
-    Dwarf_reg_locations.reg_location_description reg ~offset ()
-  with
+  match Dwarf_reg_locations.reg_location_description reg ~offset () with
   | None -> None
   | Some simple_loc_desc -> Some (Simple simple_loc_desc)
 
