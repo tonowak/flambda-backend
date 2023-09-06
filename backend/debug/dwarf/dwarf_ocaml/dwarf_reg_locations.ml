@@ -17,7 +17,7 @@ open! Dwarf_high
 module SLDL = Simple_location_description_lang
 
 let reg_location_description (reg : Reg.t) ~(offset : Stack_reg_offset.t option)
-    ~need_rvalue =
+    ?(need_rvalue = false) () =
   let module SLD = Simple_location_description in
   (* CR-someday mshinwell: Implement support for values split across registers,
      if any such still exist. *)

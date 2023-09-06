@@ -66,21 +66,19 @@ type location_description =
   | Simple of Simple_location_description.t
   | Composite of Composite_location_description.t
 
-let reg_location_description reg ~offset ~need_rvalue :
-    location_description option =
+let reg_location_description reg ~offset : location_description option =
   match
-    Dwarf_reg_locations.reg_location_description reg ~offset ~need_rvalue
+    Dwarf_reg_locations.reg_location_description reg ~offset ()
   with
   | None -> None
   | Some simple_loc_desc -> Some (Simple simple_loc_desc)
 
-let single_location_description state ~parent ~subrange ~proto_dies_for_vars
-    ~need_rvalue =
+let single_location_description state ~parent ~subrange ~proto_dies_for_vars =
   let location_description =
     let subrange_info = ARV.Subrange.info subrange in
     let reg = ARV.Subrange_info.reg subrange_info in
     let offset = ARV.Subrange_info.offset subrange_info in
-    reg_location_description reg ~offset ~need_rvalue
+    reg_location_description reg ~offset
   in
   match location_description with
   | None -> None
@@ -147,9 +145,9 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
     | Some _provenance -> function_proto_die, false
   in
   let is_parameter = ARV.Range_info.is_parameter range_info in
-  let type_and_name_attributes, need_rvalue =
+  let type_and_name_attributes =
     match type_die_reference_for_var var ~proto_dies_for_vars with
-    | None -> [], false
+    | None -> []
     | Some reference ->
       let name_for_var =
         (* For the moment assume function parameter names are unique, they
@@ -159,22 +157,22 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
         | Parameter _ -> Backend_var.name_for_debugger var
         | Local -> Backend_var.unique_name_for_debugger var
       in
-      let proto_die_reference, need_rvalue =
+      let proto_die_reference =
         match provenance with
         | Some provenance ->
-          let { Dwarf_type.die_reference; need_rvalue } =
+          let die_reference =
             Dwarf_type.variant_for_var state
               (Backend_var.Provenance.uid provenance)
               ~parent_proto_die
           in
-          die_reference, need_rvalue
-        | None -> Proto_die.reference (DS.value_type_proto_die state), false
+          die_reference
+        | None -> Proto_die.reference (DS.value_type_proto_die state)
       in
       let type_attribute =
         [DAH.create_type_from_reference ~proto_die_reference]
       in
       let name_attribute = [DAH.create_name name_for_var] in
-      name_attribute @ type_attribute, need_rvalue
+      name_attribute @ type_attribute
   in
   let location_attribute_value, location_list_in_debug_loc_table =
     (* Build a location list that identifies where the value of [var] may be
@@ -187,7 +185,7 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
         ~f:(fun (dwarf_4_location_list_entries, location_list) subrange ->
           let single_location_description =
             single_location_description state ~parent:(Some function_proto_die)
-              ~subrange ~proto_dies_for_vars ~need_rvalue
+              ~subrange ~proto_dies_for_vars
           in
           match single_location_description with
           | None -> dwarf_4_location_list_entries, location_list

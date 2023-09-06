@@ -19,5 +19,6 @@ open! Dwarf_low
 val reg_location_description :
   Reg.t ->
   offset:Stack_reg_offset.t option ->
-  need_rvalue:bool ->
+  ?need_rvalue:bool ->
+  unit ->
   Simple_location_description.t option
