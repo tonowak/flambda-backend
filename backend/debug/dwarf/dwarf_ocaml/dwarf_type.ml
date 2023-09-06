@@ -127,8 +127,8 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     | Ts_other | Ts_var _ -> fallback_die
     | Ts_predef (Array, [element_type_shape]) ->
       let element_type_reference =
-        type_shape_to_die element_type_shape ~parent_proto_die ~fallback_die
-          ~cache
+        create_wrapper_if_need_rvalue element_type_shape ~parent_proto_die
+          ~fallback_die ~cache
       in
       array_type ~parent_proto_die ~array_type_reference:reference
         ~array_type_shape:type_shape ~element_type_reference ~cache
