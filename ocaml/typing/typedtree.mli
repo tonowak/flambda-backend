@@ -158,7 +158,6 @@ and expression =
   { exp_desc: expression_desc;
     exp_loc: Location.t;
     exp_extra: (exp_extra * Location.t * attributes) list;
-    (* CR tnowak: simple type desc *)
     exp_type: Types.type_expr;
     exp_env: Env.t;
     exp_attributes: attributes;

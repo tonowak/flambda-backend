@@ -1528,8 +1528,8 @@ let transl_type_decl env rec_flag sdecl_list =
   in
   (* Compute the final environment with variance and immediacy *)
   let final_env = add_types_to_env decls env in
+  (* Save the declarations in [Type_shape] for debug info. *)
   List.iter (fun (id, decl) ->
-    (* CR tnowak: add comments, understand Ident vs Path *)
     let uid_of_path path = (Env.find_type path final_env).type_uid in
     Type_shape.add_to_type_decls (Pident id) decl uid_of_path
   ) decls;

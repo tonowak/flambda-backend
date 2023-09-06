@@ -66,17 +66,21 @@ type location_description =
   | Simple of Simple_location_description.t
   | Composite of Composite_location_description.t
 
-let reg_location_description reg ~offset : location_description option =
-  match Dwarf_reg_locations.reg_location_description reg ~offset () with
+let reg_location_description reg ~offset ~need_rvalue :
+    location_description option =
+  match
+    Dwarf_reg_locations.reg_location_description reg ~offset ~need_rvalue
+  with
   | None -> None
   | Some simple_loc_desc -> Some (Simple simple_loc_desc)
 
-let single_location_description state ~parent ~subrange ~proto_dies_for_vars =
+let single_location_description state ~parent ~subrange ~proto_dies_for_vars
+    ~need_rvalue =
   let location_description =
     let subrange_info = ARV.Subrange.info subrange in
     let reg = ARV.Subrange_info.reg subrange_info in
     let offset = ARV.Subrange_info.offset subrange_info in
-    reg_location_description reg ~offset
+    reg_location_description reg ~offset ~need_rvalue
   in
   match location_description with
   | None -> None
@@ -185,7 +189,7 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
         ~f:(fun (dwarf_4_location_list_entries, location_list) subrange ->
           let single_location_description =
             single_location_description state ~parent:(Some function_proto_die)
-              ~subrange ~proto_dies_for_vars
+              ~subrange ~proto_dies_for_vars ~need_rvalue:false
           in
           match single_location_description with
           | None -> dwarf_4_location_list_entries, location_list

@@ -137,14 +137,6 @@ module Rvalue = struct
           @ [O.DW_op_deref])
         ~at_join:[] ()
 
-  let read_field_from_block_on_dwarf_stack ~field =
-    let offset_in_bytes =
-      Targetint.mul field Targetint.size_in_bytes_as_targetint
-    in
-    (*OB.add_unsigned_const offset_in_bytes @ [O.DW_op_deref;
-      O.DW_op_stack_value]*)
-    OB.add_signed_const offset_in_bytes @ [O.DW_op_deref]
-
   let read_symbol_field symbol ~field =
     read_field ~block:(const_symbol symbol) ~field
 
