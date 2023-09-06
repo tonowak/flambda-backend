@@ -192,7 +192,7 @@ module Type_decl_shape = struct
           Tds_variant { simple_constructors; complex_constructors }
         | Type_record (lbl_list, record_repr) -> (
           match record_repr with
-          | Record_boxed _ | Record_float ->
+          | Record_boxed _ ->
             Tds_record
               (List.map
                  (fun (lbl : Types.label_declaration) ->
@@ -200,6 +200,12 @@ module Type_decl_shape = struct
                      Type_shape.of_type_desc
                        (Types.get_desc lbl.ld_type)
                        uid_of_path ))
+                 lbl_list)
+          | Record_float ->
+            Tds_record
+              (List.map
+                 (fun (lbl : Types.label_declaration) ->
+                   Ident.name lbl.ld_id, Type_shape.Ts_predef (Unboxed_float, []))
                  lbl_list)
           | Record_inlined _ | Record_unboxed -> Tds_other)
         | Type_abstract | Type_open -> Tds_other)
