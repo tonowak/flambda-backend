@@ -33,6 +33,43 @@ let create_inlined_float ~parent_proto_die () =
   in
   Proto_die.reference proto_die
 
+let array_type ~parent_proto_die ~array_type_reference ~array_type_shape
+    ~element_type_reference ~cache ~fallback_die =
+  let array_type_die =
+    Proto_die.create ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Array_type
+      ~attribute_values:
+        [ DAH.create_name (Type_shape.type_name array_type_shape);
+          DAH.create_type_from_reference
+            ~proto_die_reference:element_type_reference;
+          (* We can't use DW_AT_byte_size or DW_AT_bit_size since we don't know
+             how large the array might be. *)
+          (* DW_AT_byte_stride probably isn't required strictly speaking, but
+             let's add it for the avoidance of doubt. *)
+          DAH.create_byte_stride ~bytes:(Numbers.Int8.of_int_exn Arch.size_addr)
+        ]
+      ()
+  in
+  (* let get_num_elements = let module O = Dwarf_operator in let module Uint8 =
+     Numbers.Uint8 in [ (* Load the address of the array *)
+     O.DW_op_push_object_address; (* Move back to the header *) O.DW_op_const1u
+     (Uint8.of_nonnegative_int_exn Arch.size_addr); O.DW_op_minus; (* Load the
+     header *) O.DW_op_deref; (* Extract the size field, in words *)
+     O.DW_op_const1u (Uint8.of_nonnegative_int_exn 10); O.DW_op_shr ] |>
+     Single_location_description.of_simple_location_description in *)
+  Proto_die.create_ignore ~parent:(Some array_type_die)
+    ~tag:Dwarf_tag.Subrange_type
+    ~attribute_values:
+      [ (* Thankfully, all that lldb cares about is DW_AT_count. *)
+        DAH.create_count_const 0L (* DAH.create_count get_num_elements *) ]
+    ();
+  Proto_die.create_ignore ~reference:array_type_reference
+    ~parent:(Some parent_proto_die) ~tag:Dwarf_tag.Reference_type
+    ~attribute_values:
+      [ DAH.create_byte_size_exn ~byte_size:8;
+        DAH.create_type ~proto_die:array_type_die ]
+    ();
+  array_type_reference
+
 let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     ~parent_proto_die ~fallback_die
     ~(cache : Proto_die.reference Type_shape.Type_shape.Tbl.t) =
@@ -44,32 +81,43 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     Type_shape.Type_shape.Tbl.add cache type_shape reference;
     match type_shape with
     | Ts_other | Ts_var _ -> fallback_die
-    | Ts_predef predef ->
+    | Ts_predef (Array, [element_type_shape]) ->
+      let element_type_reference =
+        type_shape_to_die element_type_shape ~parent_proto_die ~fallback_die
+          ~cache
+      in
+      array_type ~parent_proto_die ~array_type_reference:reference
+        ~array_type_shape:type_shape ~element_type_reference ~cache
+        ~fallback_die
+    | Ts_predef (predef, _) ->
       (match predef with
       | Char ->
-        let enum = Proto_die.create ~reference ~parent:(Some parent_proto_die)
-                          ~tag:Dwarf_tag.Enumeration_type
-                          ~attribute_values:[
-                            DAH.create_name "char";
-                            DAH.create_byte_size_exn ~byte_size:8
-                          ] () in
-        List.iter (fun i ->
-          Proto_die.create_ignore ~parent:(Some enum)
-            ~tag:Dwarf_tag.Enumerator
-            ~attribute_values:[
-              DAH.create_const_value ~value:(Int64.of_int (2 * i + 1));
-              DAH.create_name (if i = 0 then "\\0" else String.make 1 (Char.chr i))
-            ] ()
-        ) (List.init 255 (fun i -> i));
-        reference
+        let enum =
+          Proto_die.create ~reference ~parent:(Some parent_proto_die)
+            ~tag:Dwarf_tag.Enumeration_type
+            ~attribute_values:
+              [DAH.create_name "char"; DAH.create_byte_size_exn ~byte_size:8]
+            ()
+        in
+        List.iter
+          (fun i ->
+            Proto_die.create_ignore ~parent:(Some enum)
+              ~tag:Dwarf_tag.Enumerator
+              ~attribute_values:
+                [ DAH.create_const_value ~value:(Int64.of_int ((2 * i) + 1));
+                  DAH.create_name
+                    (if i = 0 then "\\0" else String.make 1 (Char.chr i)) ]
+              ())
+          (List.init 255 (fun i -> i))
       | _ ->
         Proto_die.create_ignore ~reference ~parent:(Some parent_proto_die)
           ~tag:Dwarf_tag.Typedef
           ~attribute_values:
             [ DAH.create_name (Type_shape.type_name type_shape);
-              DAH.create_type_from_reference ~proto_die_reference:fallback_die ]
-          ();
-        reference)
+              DAH.create_type_from_reference ~proto_die_reference:fallback_die
+            ]
+          ());
+      reference
     | Ts_constr (type_uid, shapes) -> (
       match Uid.Tbl.find_opt Type_shape.all_type_decls type_uid with
       | None | Some { definition = Tds_other; _ } -> fallback_die
@@ -104,7 +152,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
             List.for_all
               (fun (_field_name, type_shape) ->
                 match type_shape with
-                | Type_shape.Type_shape.Ts_predef Float -> true
+                | Type_shape.Type_shape.Ts_predef (Float, _) -> true
                 | _ -> false)
               field_list
           in

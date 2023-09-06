@@ -8,6 +8,7 @@ module Type_shape : sig
     | Nativeint
     | Int32
     | Int64
+    | Array
     | Floatarray
     | Int
     | Char
@@ -19,7 +20,7 @@ module Type_shape : sig
     | Ts_constr of Shape.Uid.t * t list
     | Ts_tuple of t list
     | Ts_var of string option
-    | Ts_predef of predef
+    | Ts_predef of predef * t list
     | Ts_other
 
   include Identifiable.S with type t := t

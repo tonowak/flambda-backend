@@ -173,6 +173,14 @@ val create_language :
 
 val create_declaration : unit -> Dwarf_attribute_values.Attribute_value.t
 
+val create_byte_stride :
+  bytes:Numbers.Int8.t -> Dwarf_attribute_values.Attribute_value.t
+
+val create_count :
+  Single_location_description.t -> Dwarf_attribute_values.Attribute_value.t
+
+val create_count_const : Int64.t -> Dwarf_attribute_values.Attribute_value.t
+
 (** OCaml-specific DWARF attributes. *)
 
 val create_ocaml_compiler_version :
