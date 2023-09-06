@@ -134,6 +134,8 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
     (var : Backend_var.t) ~ident_for_type ~range =
   let range_info = ARV.Range.info range in
   let provenance = ARV.Range_info.provenance range_info in
+  (* CR tnowak to mshinwell: the parent_proto_die here seems to be
+     DW_TAG_subprogram instead of DW_TAG_compile_unit, which seems wrong. *)
   let (parent_proto_die : Proto_die.t), hidden =
     match provenance with
     | None ->
@@ -159,7 +161,7 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
         match provenance with
         | Some provenance ->
           let die_reference =
-            Dwarf_type.variant_for_var state
+            Dwarf_type.variable_to_die state
               (Backend_var.Provenance.uid provenance)
               ~parent_proto_die
           in
