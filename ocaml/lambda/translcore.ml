@@ -1184,7 +1184,7 @@ and add_type_shapes_of_vars cases =
     let var_list = Typedtree.pat_bound_idents_full Sort.value case.c_lhs in
     let uid_of_path path = (Env.find_type path case.c_lhs.pat_env).type_uid in
     List.iter (fun (_ident, _loc, type_expr, var_uid, _mode) ->
-        Type_shape.add_to_type_shapes var_uid (get_desc type_expr) uid_of_path)
+        Type_shape.add_to_type_shapes var_uid type_expr uid_of_path)
       var_list
   in
   List.iter add_case cases

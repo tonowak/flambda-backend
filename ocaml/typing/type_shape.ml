@@ -1,78 +1,79 @@
 module Uid = Shape.Uid
 
 module Type_shape = struct
-  type predef =
-    | String
-    | Bytes
-    | Float
-    | Nativeint
-    | Int32
-    | Int64
-    | Array
-    | Floatarray
-    | Int
-    | Char
-    | Unboxed_float
-    | Lazy_t
-    | Extension_constructor
+  module Predef = struct
+    type t =
+      | Array
+      | Bytes
+      | Char
+      | Extension_constructor
+      | Float
+      | Floatarray
+      | Int
+      | Int32
+      | Int64
+      | Lazy_t
+      | Nativeint
+      | String
+      | Unboxed_float
 
-  let predef_to_string = function
-    | String -> "string"
-    | Bytes -> "bytes"
-    | Float -> "float"
-    | Nativeint -> "nativeint"
-    | Int32 -> "int32"
-    | Int64 -> "int64"
-    | Array -> "array"
-    | Floatarray -> "floatarray"
-    | Int -> "int"
-    | Char -> "char"
-    | Unboxed_float -> "float#"
-    | Lazy_t -> "lazy_t"
-    | Extension_constructor -> "extension_constructor"
+    let to_string = function
+      | Array -> "array"
+      | Bytes -> "bytes"
+      | Char -> "char"
+      | Extension_constructor -> "extension_constructor"
+      | Float -> "float"
+      | Floatarray -> "floatarray"
+      | Int -> "int"
+      | Int32 -> "int32"
+      | Int64 -> "int64"
+      | Lazy_t -> "lazy_t"
+      | Nativeint -> "nativeint"
+      | String -> "string"
+      | Unboxed_float -> "float#"
 
-  let predef_of_string = function
-    | "string" -> Some String
-    | "bytes" -> Some Bytes
-    | "float" -> Some Float
-    | "nativeint" -> Some Nativeint
-    | "int32" -> Some Int32
-    | "int64" -> Some Int64
-    | "array" -> Some Array
-    | "floatarray" -> Some Floatarray
-    | "int" -> Some Int
-    | "char" -> Some Char
-    | "float#" -> Some Unboxed_float
-    | "lazy_t" -> Some Lazy_t
-    | "extension_constructor" -> Some Extension_constructor
-    | _ -> None
+    let of_string = function
+      | "array" -> Some Array
+      | "bytes" -> Some Bytes
+      | "char" -> Some Char
+      | "extension_constructor" -> Some Extension_constructor
+      | "float" -> Some Float
+      | "float#" -> Some Unboxed_float
+      | "floatarray" -> Some Floatarray
+      | "int" -> Some Int
+      | "int32" -> Some Int32
+      | "int64" -> Some Int64
+      | "lazy_t" -> Some Lazy_t
+      | "nativeint" -> Some Nativeint
+      | "string" -> Some String
+      | _ -> None
+  end
 
   type t =
     | Ts_constr of Uid.t * t list
     | Ts_tuple of t list
     | Ts_var of string option
-    | Ts_predef of predef * t list
+    | Ts_predef of Predef.t * t list
     | Ts_other
 
-  let rec of_type_desc (desc : Types.type_desc) uid_of_path =
-    let expr_to_t expr = of_type_desc (Types.get_desc expr) uid_of_path in
+  let rec of_type_expr (expr : Types.type_expr) uid_of_path =
+    let desc = Types.get_desc expr in
     let map_expr_list (exprs : Types.type_expr list) =
-      List.map expr_to_t exprs
+      List.map (fun expr -> of_type_expr expr uid_of_path) exprs
     in
     match desc with
     | Tconstr (path, constrs, _abbrev_memo) -> (
-      match predef_of_string (Path.name path) with
+      match Predef.of_string (Path.name path) with
       | Some predef -> Ts_predef (predef, map_expr_list constrs)
       | None -> Ts_constr (uid_of_path path, map_expr_list constrs))
     | Ttuple exprs -> Ts_tuple (map_expr_list exprs)
     | Tvar { name; layout = _ } -> Ts_var name
-    | Tpoly (type_expr, []) ->
-      of_type_desc (Types.get_desc type_expr) uid_of_path
+    | Tpoly (type_expr, []) -> of_type_expr type_expr uid_of_path
     | _ -> Ts_other
 
   let rec print ppf = function
     | Ts_predef (predef, shapes) ->
-      Format.fprintf ppf "%s (%a)" (predef_to_string predef)
+      Format.fprintf ppf "%s (%a)" (Predef.to_string predef)
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
            print)
@@ -152,13 +153,13 @@ module Type_decl_shape = struct
     | Cstr_tuple list ->
       List.map
         (fun (type_expr, _flag) ->
-          None, Type_shape.of_type_desc (Types.get_desc type_expr) uid_of_path)
+          None, Type_shape.of_type_expr type_expr uid_of_path)
         list
     | Cstr_record list ->
       List.map
         (fun (lbl : Types.label_declaration) ->
           ( Some (Ident.name lbl.ld_id),
-            Type_shape.of_type_desc (Types.get_desc lbl.ld_type) uid_of_path ))
+            Type_shape.of_type_expr lbl.ld_type uid_of_path ))
         list
 
   let is_empty_constructor_list (cstr_args : Types.constructor_declaration) =
@@ -174,8 +175,7 @@ module Type_decl_shape = struct
     let definition =
       match type_declaration.type_manifest with
       | Some type_expr ->
-        Tds_alias
-          (Type_shape.of_type_desc (Types.get_desc type_expr) uid_of_path)
+        Tds_alias (Type_shape.of_type_expr type_expr uid_of_path)
       | None -> (
         match type_declaration.type_kind with
         | Type_variant (cstr_list, _variant_repr) ->
@@ -197,9 +197,7 @@ module Type_decl_shape = struct
               (List.map
                  (fun (lbl : Types.label_declaration) ->
                    ( Ident.name lbl.ld_id,
-                     Type_shape.of_type_desc
-                       (Types.get_desc lbl.ld_type)
-                       uid_of_path ))
+                     Type_shape.of_type_expr lbl.ld_type uid_of_path ))
                  lbl_list)
           | Record_float ->
             Tds_record
@@ -212,8 +210,7 @@ module Type_decl_shape = struct
     in
     let type_params =
       List.map
-        (fun type_expr ->
-          Type_shape.of_type_desc (Types.get_desc type_expr) uid_of_path)
+        (fun type_expr -> Type_shape.of_type_expr type_expr uid_of_path)
         type_declaration.type_params
     in
     { path; definition; type_params; compilation_unit }
@@ -256,12 +253,17 @@ module Type_decl_shape = struct
     Format.fprintf ppf "path=%a, definition=(%a)" Path.print t.path print_tds
       t.definition
 
+  let map_snd f list = List.map (fun (fst, snd) -> fst, f snd) list
+
   let replace_tvar (t : t) (shapes : Type_shape.t list) =
-    Format.eprintf "replacing tvar %a; %a; %a\n%!" print t
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
-      shapes
-      (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
-      t.type_params;
+    let debug = false in
+    if debug
+    then
+      Format.eprintf "replacing tvar %a; %a; %a\n%!" print t
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
+        shapes
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
+        t.type_params;
     let replace_tvar =
       Type_shape.replace_tvar ~pairs:(List.combine t.type_params shapes)
     in
@@ -274,19 +276,9 @@ module Type_decl_shape = struct
           Tds_variant
             { simple_constructors;
               complex_constructors =
-                List.map
-                  (fun (name, shape_list) ->
-                    ( name,
-                      List.map
-                        (fun (name, shape) -> name, replace_tvar shape)
-                        shape_list ))
-                  complex_constructors
+                map_snd (map_snd replace_tvar) complex_constructors
             }
-        | Tds_record field_list ->
-          Tds_record
-            (List.map
-               (fun (name, shape) -> name, replace_tvar shape)
-               field_list)
+        | Tds_record field_list -> Tds_record (map_snd replace_tvar field_list)
         | Tds_alias type_shape -> Tds_alias (replace_tvar type_shape)
         | Tds_other -> Tds_other)
     }
@@ -305,8 +297,8 @@ let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   in
   Uid.Tbl.add all_type_decls uid type_decl_shape
 
-let add_to_type_shapes var_uid type_desc uid_of_path =
-  let type_shape = Type_shape.of_type_desc type_desc uid_of_path in
+let add_to_type_shapes var_uid type_expr uid_of_path =
+  let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid type_shape
 
 let tuple_to_string (strings : string list) =
@@ -324,8 +316,8 @@ let shapes_to_string (strings : string list) =
 let rec type_name (type_shape : Type_shape.t) =
   match type_shape with
   | Ts_predef (predef, shapes) ->
-    let shapes = shapes_to_string (List.map type_name shapes) in
-    shapes ^ Type_shape.predef_to_string predef
+    shapes_to_string (List.map type_name shapes)
+    ^ Type_shape.Predef.to_string predef
   | Ts_other -> "unknown"
   | Ts_tuple shapes -> tuple_to_string (List.map type_name shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
@@ -334,13 +326,10 @@ let rec type_name (type_shape : Type_shape.t) =
     | None | Some { definition = Tds_other; _ } -> "unknown"
     | Some type_decl_shape ->
       let args = shapes_to_string (List.map type_name shapes) in
-      let args = match args with "" -> args | _ -> args ^ " " in
-      let compilation_unit_name =
-        type_decl_shape.compilation_unit
-        |> Option.map (fun x -> Compilation_unit.full_path_as_string x ^ ".")
-        |> Option.value ~default:""
-      in
       let name_with_compilation_unit =
-        compilation_unit_name ^ Path.name type_decl_shape.path
+        (match type_decl_shape.compilation_unit with
+        | None -> ""
+        | Some c -> Compilation_unit.full_path_as_string c ^ ".")
+        ^ Path.name type_decl_shape.path
       in
       args ^ name_with_compilation_unit)

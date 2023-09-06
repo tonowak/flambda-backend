@@ -1,26 +1,28 @@
 module Uid = Shape.Uid
 
 module Type_shape : sig
-  type predef =
-    | String
-    | Bytes
-    | Float
-    | Nativeint
-    | Int32
-    | Int64
-    | Array
-    | Floatarray
-    | Int
-    | Char
-    | Unboxed_float
-    | Lazy_t
-    | Extension_constructor
+  module Predef : sig
+    type t =
+      | Array
+      | Bytes
+      | Char
+      | Extension_constructor
+      | Float
+      | Floatarray
+      | Int
+      | Int32
+      | Int64
+      | Lazy_t
+      | Nativeint
+      | String
+      | Unboxed_float
+  end
 
   type t =
     | Ts_constr of Shape.Uid.t * t list
     | Ts_tuple of t list
     | Ts_var of string option
-    | Ts_predef of predef * t list
+    | Ts_predef of Predef.t * t list
     | Ts_other
 
   include Identifiable.S with type t := t
@@ -57,6 +59,6 @@ val all_type_shapes : Type_shape.t Uid.Tbl.t
 val add_to_type_decls :
   Path.t -> Types.type_declaration -> (Path.t -> Uid.t) -> unit
 
-val add_to_type_shapes : Uid.t -> Types.type_desc -> (Path.t -> Uid.t) -> unit
+val add_to_type_shapes : Uid.t -> Types.type_expr -> (Path.t -> Uid.t) -> unit
 
 val type_name : Type_shape.t -> string
