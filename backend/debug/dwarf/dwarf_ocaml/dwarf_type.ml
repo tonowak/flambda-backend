@@ -328,7 +328,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
     ~(cache : Proto_die.reference Type_shape.Type_shape.Tbl.t) =
   match Type_shape.Type_shape.Tbl.find_opt cache type_shape with
   | Some reference -> reference
-  | None -> (
+  | None ->
     let reference = Proto_die.create_reference () in
     Type_shape.Type_shape.Tbl.add cache type_shape reference;
     let name = Type_shape.type_name type_shape ~load_decls_from_cms in
@@ -405,7 +405,9 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
         create_tuple_die ~reference ~parent_proto_die ~name ~fields;
         true
     in
-    match successfully_created with true -> reference | false -> fallback_die)
+    let reference = if successfully_created then reference else fallback_die in
+    Type_shape.Type_shape.Tbl.add (* replace *) cache type_shape reference;
+    reference
 
 let variable_to_die state var_uid ~parent_proto_die =
   let fallback_die = Proto_die.reference (DS.value_type_proto_die state) in
