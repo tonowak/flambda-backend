@@ -5,6 +5,10 @@ module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module SLDL = Simple_location_description_lang
 
+let load_decls_from_cms path =
+  let cms_infos = Cms_format.read path in
+  cms_infos.cms_shapes_for_dwarf
+
 let map_snd f list = List.map (fun (fst, snd) -> fst, f snd) list
 
 let wrap_die_under_a_pointer ~proto_die ~reference ~parent_proto_die =
@@ -327,7 +331,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
   | None -> (
     let reference = Proto_die.create_reference () in
     Type_shape.Type_shape.Tbl.add cache type_shape reference;
-    let name = Type_shape.type_name type_shape in
+    let name = Type_shape.type_name type_shape ~load_decls_from_cms in
     let successfully_created =
       match type_shape with
       | Ts_other | Ts_var _ -> false
@@ -349,8 +353,10 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
         create_typedef_die ~reference ~parent_proto_die ~name
           ~child_die:fallback_die;
         true
-      | Ts_constr (type_uid, shapes) -> (
-        match Uid.Tbl.find_opt Type_shape.all_type_decls type_uid with
+      | Ts_constr ((type_uid, type_path), shapes) -> (
+        match
+          Type_shape.find_in_type_decls type_uid type_path ~load_decls_from_cms
+        with
         | None | Some { definition = Tds_other; _ } -> false
         | Some type_decl_shape -> (
           let type_decl_shape =

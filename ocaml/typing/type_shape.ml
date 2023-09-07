@@ -50,7 +50,7 @@ module Type_shape = struct
   end
 
   type t =
-    | Ts_constr of Uid.t * t list
+    | Ts_constr of (Uid.t * Path.t) * t list
     | Ts_tuple of t list
     | Ts_var of string option
     | Ts_predef of Predef.t * t list
@@ -65,7 +65,7 @@ module Type_shape = struct
     | Tconstr (path, constrs, _abbrev_memo) -> (
       match Predef.of_string (Path.name path) with
       | Some predef -> Ts_predef (predef, map_expr_list constrs)
-      | None -> Ts_constr (uid_of_path path, map_expr_list constrs))
+      | None -> Ts_constr ((uid_of_path path, path), map_expr_list constrs))
     | Ttuple exprs -> Ts_tuple (map_expr_list exprs)
     | Tvar { name; layout = _ } -> Ts_var name
     | Tpoly (type_expr, []) -> of_type_expr type_expr uid_of_path
@@ -78,8 +78,9 @@ module Type_shape = struct
            ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
            print)
         shapes
-    | Ts_constr (uid, shapes) ->
-      Format.fprintf ppf "Ts_constr uid=%a (%a)" Uid.print uid
+    | Ts_constr ((uid, path), shapes) ->
+      Format.fprintf ppf "Ts_constr uid=%a path=%a (%a)" Uid.print uid
+        Path.print path
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ", ")
            print)
@@ -264,24 +265,34 @@ module Type_decl_shape = struct
         shapes
         (Format.pp_print_list ~pp_sep:Format.pp_print_space Type_shape.print)
         t.type_params;
-    let replace_tvar =
-      Type_shape.replace_tvar ~pairs:(List.combine t.type_params shapes)
-    in
-    { type_params = [];
-      path = t.path;
-      compilation_unit = t.compilation_unit;
-      definition =
-        (match t.definition with
-        | Tds_variant { simple_constructors; complex_constructors } ->
-          Tds_variant
-            { simple_constructors;
-              complex_constructors =
-                map_snd (map_snd replace_tvar) complex_constructors
-            }
-        | Tds_record field_list -> Tds_record (map_snd replace_tvar field_list)
-        | Tds_alias type_shape -> Tds_alias (replace_tvar type_shape)
-        | Tds_other -> Tds_other)
-    }
+    match List.length t.type_params == List.length shapes with
+    | true ->
+      let replace_tvar =
+        Type_shape.replace_tvar ~pairs:(List.combine t.type_params shapes)
+      in
+      { type_params = [];
+        path = t.path;
+        compilation_unit = t.compilation_unit;
+        definition =
+          (match t.definition with
+          | Tds_variant { simple_constructors; complex_constructors } ->
+            Tds_variant
+              { simple_constructors;
+                complex_constructors =
+                  map_snd (map_snd replace_tvar) complex_constructors
+              }
+          | Tds_record field_list ->
+            Tds_record (map_snd replace_tvar field_list)
+          | Tds_alias type_shape -> Tds_alias (replace_tvar type_shape)
+          | Tds_other -> Tds_other)
+      }
+    | false ->
+      (* CR tnowak: investigate *)
+      { type_params = [];
+        path = t.path;
+        compilation_unit = t.compilation_unit;
+        definition = Tds_other
+      }
 end
 
 let (all_type_decls : Type_decl_shape.t Uid.Tbl.t) = Uid.Tbl.create 42
@@ -313,19 +324,41 @@ let shapes_to_string (strings : string list) =
   | hd :: [] -> hd ^ " "
   | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ") "
 
-let rec type_name (type_shape : Type_shape.t) =
+let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
+    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
+  let compilation_unit_type_decls =
+    match type_path with
+    | Pident _ -> Some all_type_decls
+    | Pdot (Pident compilation_unit, _type_name) -> (
+      (* CR tnowak: change the [String.lowercase_ascii] to a proper function. *)
+      let filename = Ident.name compilation_unit |> String.lowercase_ascii in
+      match Load_path.find_uncap (filename ^ ".cms") with
+      | exception Not_found -> None
+      | fn ->
+        let type_decls = load_decls_from_cms fn in
+        Some type_decls)
+    | _ -> None
+  in
+  Option.bind compilation_unit_type_decls (fun tbl ->
+      Uid.Tbl.find_opt tbl type_uid)
+
+let rec type_name (type_shape : Type_shape.t)
+    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
   match type_shape with
   | Ts_predef (predef, shapes) ->
-    shapes_to_string (List.map type_name shapes)
+    shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
     ^ Type_shape.Predef.to_string predef
   | Ts_other -> "unknown"
-  | Ts_tuple shapes -> tuple_to_string (List.map type_name shapes)
+  | Ts_tuple shapes ->
+    tuple_to_string (List.map (type_name ~load_decls_from_cms) shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
-  | Ts_constr (type_uid, shapes) -> (
-    match Uid.Tbl.find_opt all_type_decls type_uid with
+  | Ts_constr ((type_uid, type_path), shapes) -> (
+    match find_in_type_decls type_uid type_path ~load_decls_from_cms with
     | None | Some { definition = Tds_other; _ } -> "unknown"
     | Some type_decl_shape ->
-      let args = shapes_to_string (List.map type_name shapes) in
+      let args =
+        shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
+      in
       let name_with_compilation_unit =
         (match type_decl_shape.compilation_unit with
         | None -> ""

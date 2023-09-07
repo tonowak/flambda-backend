@@ -19,7 +19,7 @@ module Type_shape : sig
   end
 
   type t =
-    | Ts_constr of Shape.Uid.t * t list
+    | Ts_constr of (Uid.t * Path.t) * t list
     | Ts_tuple of t list
     | Ts_var of string option
     | Ts_predef of Predef.t * t list
@@ -61,4 +61,13 @@ val add_to_type_decls :
 
 val add_to_type_shapes : Uid.t -> Types.type_expr -> (Path.t -> Uid.t) -> unit
 
-val type_name : Type_shape.t -> string
+val find_in_type_decls :
+  Uid.t ->
+  Path.t ->
+  load_decls_from_cms:(string -> Type_decl_shape.t Uid.Tbl.t) ->
+  Type_decl_shape.t option
+
+val type_name :
+  Type_shape.t ->
+  load_decls_from_cms:(string -> Type_decl_shape.t Uid.Tbl.t) ->
+  string
