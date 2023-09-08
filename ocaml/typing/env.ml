@@ -2689,7 +2689,7 @@ let (initial_safe_string, initial_unsafe_string) =
   in
   Ident.Tbl.iter (fun type_ident decl ->
     let (env : t) = fst ret in
-    let uid_of_path path = (find_type path env).type_uid in
+    let uid_of_path path = Some (find_type path env).type_uid in
     Type_shape.add_to_type_decls (Pident type_ident) decl uid_of_path;
   ) added_types;
   ret

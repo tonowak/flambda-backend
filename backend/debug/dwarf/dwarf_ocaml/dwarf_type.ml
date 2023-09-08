@@ -414,5 +414,6 @@ let variable_to_die state var_uid ~parent_proto_die =
   match Uid.Tbl.find_opt Type_shape.all_type_shapes var_uid with
   | None -> fallback_die
   | Some type_shape ->
+    (* CR tnowak: make cache global instead of local for each variable *)
     let cache = Type_shape.Type_shape.Tbl.create 42 in
     type_shape_to_die type_shape ~parent_proto_die ~fallback_die ~cache

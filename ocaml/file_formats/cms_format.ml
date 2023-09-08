@@ -57,6 +57,14 @@ let read filename =
     )
 
 let save_cms filename modname sourcefile shape =
+  if String.ends_with ~suffix:"native/env.cms" filename
+  then
+    let to_map uid_tbl =
+      Shape.Uid.Tbl.to_list uid_tbl |> Shape.Uid.Map.of_list
+    in
+    Format.eprintf "all_type_decls=%a\n%!"
+      (Shape.Uid.Map.print Type_shape.Type_decl_shape.print)
+      (to_map Type_shape.all_type_decls);
   if (!Clflags.binary_annotations_cms && not !Clflags.print_types) then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] filename

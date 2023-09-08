@@ -327,6 +327,57 @@ let set_private_row env loc p decl =
 
 (* Translate one type declaration *)
 
+let split_path_by_compilation_unit (path : Path.t) =
+  match path with
+  | Pdot(Pident i, s) -> Some (i, Path.Pident (Ident.create_local s))
+  | Pident _i -> assert false
+  | Papply _ -> assert false
+  | Pdot(_p, _s) -> None
+
+module Shape_reduce = Shape.Make_reduce(struct
+    type env = (*Shape.t Ident.Tbl.t*) unit
+
+    let fuel = 10
+
+    let read_unit_shape ~unit_name =
+      let filename = String.uncapitalize_ascii unit_name in
+      match Load_path.find_uncap (filename ^ ".cms") with
+      | exception Not_found -> None
+      | fn ->
+        (* CR tnowak: exception? *)
+        let cms_infos = Cms_format.read fn in
+        cms_infos.cms_impl_shape
+
+    let find_shape _env _ident = (*Ident.Tbl.find env ident*) assert false
+  end)
+
+let uid_of_path ~env path =
+  match split_path_by_compilation_unit path with
+  | None -> None
+  | Some (maybe_compilation_unit, subpath) ->
+    match Ident.is_global maybe_compilation_unit with
+    | false ->
+      (match (Env.find_type path env) with
+      | exception Not_found -> None
+      | type_ -> Some type_.type_uid
+      )
+    | true ->
+      let filename = Ident.name maybe_compilation_unit |> String.uncapitalize_ascii in
+      match Load_path.find_uncap (filename ^ ".cms") with
+      | exception Not_found -> None
+      | fn ->
+        (* CR tnowak: exception? *)
+        let cms_infos = Cms_format.read fn in
+        match cms_infos.cms_impl_shape with
+        | None -> None
+        | Some shape ->
+          match subpath with
+          | Pident i ->
+            let shape = Shape.proj shape (Shape.Item.type_ i) in
+            let shape = Shape_reduce.reduce () shape in
+            shape.uid
+          | _ -> assert false
+
 let transl_global_flags loc attrs =
   let transl_global_flag loc (r : (bool,unit) result) =
     match r with
@@ -1530,8 +1581,7 @@ let transl_type_decl env rec_flag sdecl_list =
   let final_env = add_types_to_env decls env in
   (* Save the declarations in [Type_shape] for debug info. *)
   List.iter (fun (id, decl) ->
-    let uid_of_path path = (Env.find_type path final_env).type_uid in
-    Type_shape.add_to_type_decls (Pident id) decl uid_of_path
+    Type_shape.add_to_type_decls (Pident id) decl (uid_of_path ~env)
   ) decls;
   (* Check re-exportation *)
   let decls = List.map2 (check_abbrev final_env) sdecl_list decls in

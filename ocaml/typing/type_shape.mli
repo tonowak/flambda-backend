@@ -57,9 +57,9 @@ val all_type_shapes : Type_shape.t Uid.Tbl.t
 
 (* Passing [Path.t -> Uid.t] instead of [Env.t] to avoid a dependency cycle. *)
 val add_to_type_decls :
-  Path.t -> Types.type_declaration -> (Path.t -> Uid.t) -> unit
+  Path.t -> Types.type_declaration -> (Path.t -> Uid.t option) -> unit
 
-val add_to_type_shapes : Uid.t -> Types.type_expr -> (Path.t -> Uid.t) -> unit
+val add_to_type_shapes : Uid.t -> Types.type_expr -> (Path.t -> Uid.t option) -> unit
 
 val find_in_type_decls :
   Uid.t ->
