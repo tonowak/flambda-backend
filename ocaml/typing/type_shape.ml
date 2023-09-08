@@ -65,10 +65,10 @@ module Type_shape = struct
     | Tconstr (path, constrs, _abbrev_memo) -> (
       match Predef.of_string (Path.name path) with
       | Some predef -> Ts_predef (predef, map_expr_list constrs)
-      | None -> (match uid_of_path path with
+      | None -> (
+        match uid_of_path path with
         | Some uid -> Ts_constr ((uid, path), map_expr_list constrs)
-        | None -> Ts_other
-      ))
+        | None -> Ts_other))
     | Ttuple exprs -> Ts_tuple (map_expr_list exprs)
     | Tvar { name; layout = _ } -> Ts_var name
     | Tpoly (type_expr, []) -> of_type_expr type_expr uid_of_path
@@ -334,20 +334,24 @@ let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
   if path_s = "Env!.t"
   then (
     Format.eprintf "Path %a\n" Path.print type_path;
-    Format.eprintf "Trying to access %a\n" Format.pp_print_string debug_uid_name;
-  );
-  (*Format.eprintf "Trying to access %a\n" Format.pp_print_string debug_uid_name;*)
-(*let proper_env_uid = "Env.676" in*)
-(*if debug_uid_name = proper_env_uid then*)
+    Format.eprintf "Trying to access %a\n" Format.pp_print_string debug_uid_name);
+  (*Format.eprintf "Trying to access %a\n" Format.pp_print_string
+    debug_uid_name;*)
+  (*let proper_env_uid = "Env.676" in*)
+  (*if debug_uid_name = proper_env_uid then*)
   let compilation_unit_type_decls =
     match type_path with
     | Pident _ -> Some all_type_decls
     | Pdot (Pident compilation_unit, _type_name) -> (
       (* CR tnowak: change the [String.lowercase_ascii] to a proper function. *)
       let filename = Ident.name compilation_unit |> String.uncapitalize_ascii in
-      (*Format.eprintf "Finding cms file %a\n" Format.pp_print_string filename;*)
+      (*Format.eprintf "Finding cms file %a\n" Format.pp_print_string
+        filename;*)
       match Load_path.find_uncap (filename ^ ".cms") with
-      | exception Not_found -> (*Format.eprintf "Didn't find cms file %a\n" Format.pp_print_string filename;*) None
+      | exception Not_found ->
+        (*Format.eprintf "Didn't find cms file %a\n" Format.pp_print_string
+          filename;*)
+        None
       | fn ->
         let type_decls = load_decls_from_cms fn in
         Some type_decls)

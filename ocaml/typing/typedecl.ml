@@ -348,28 +348,29 @@ module Shape_reduce = Shape.Make_reduce(struct
         let cms_infos = Cms_format.read fn in
         cms_infos.cms_impl_shape
 
-    let find_shape _env _ident = (*Ident.Tbl.find env ident*) assert false
+    (* CR tnowak: understand this function *)
+    let find_shape _env _ident = (*Ident.Tbl.find env ident*) Shape.dummy_mod
   end)
 
 let uid_of_path ~env path =
   match split_path_by_compilation_unit path with
-  | None -> Printf.eprintf "none0\n"; None
+  | None -> None
   | Some (maybe_compilation_unit, subpath) ->
     match Ident.is_global maybe_compilation_unit with
     | false ->
       (match (Env.find_type path env) with
-       | exception Not_found -> Printf.eprintf "none1\n"; None
+       | exception Not_found -> None
       | type_ -> Some type_.type_uid
       )
     | true ->
       let filename = Ident.name maybe_compilation_unit |> String.uncapitalize_ascii in
       match Load_path.find_uncap (filename ^ ".cms") with
-      | exception Not_found -> Format.eprintf "none2 %a\n" Format.pp_print_string filename; None
+      | exception Not_found -> None
       | fn ->
         (* CR tnowak: exception? *)
         let cms_infos = Cms_format.read fn in
         match cms_infos.cms_impl_shape with
-        | None -> Printf.eprintf "none3\n"; None
+        | None -> None
         | Some shape ->
           match subpath with
           | Pident i ->

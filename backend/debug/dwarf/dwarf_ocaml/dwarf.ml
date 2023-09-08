@@ -62,7 +62,7 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_begin
       ~value_type_proto_die ~start_of_code_symbol debug_loc_table
       debug_ranges_table address_table location_list_table
   in
-  let print_shapes_and_decls = true in
+  let print_shapes_and_decls = false in
   if print_shapes_and_decls
   then (
     let to_map uid_tbl =
