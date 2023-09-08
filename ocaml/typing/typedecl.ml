@@ -357,7 +357,7 @@ module Shape_reduce = Shape.Make_reduce(struct
   end)
 
 let uid_of_path ~env path =
-  let compilation_unit, path = split_type_path_at_compilation_unit path in
+  let compilation_unit, _path = split_type_path_at_compilation_unit path in
   match compilation_unit with
   | None ->
     (match (Env.find_type path env) with
@@ -374,12 +374,14 @@ let uid_of_path ~env path =
       match cms_infos.cms_impl_shape with
       | None -> None
       | Some shape ->
-        match path with
-        | Pident i ->
-          let shape = Shape.proj shape (Shape.Item.type_ i) in
-          let shape = Shape_reduce.reduce () shape in
-          shape.uid
-        | _ -> assert false
+        let shape =
+          Shape.of_path
+            ~find_shape:(fun _sig_comp_kind ident ->
+              assert (Ident.name ident = compilation_unit); shape)
+            ~namespace:Type path
+        in
+        let shape = Shape_reduce.reduce () shape in
+        shape.uid
 
 let transl_global_flags loc attrs =
   let transl_global_flag loc (r : (bool,unit) result) =
