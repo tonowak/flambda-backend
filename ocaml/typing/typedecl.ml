@@ -330,8 +330,8 @@ let set_private_row env loc p decl =
 let split_path_by_compilation_unit (path : Path.t) =
   match path with
   | Pdot(Pident i, s) -> Some (i, Path.Pident (Ident.create_local s))
-  | Pident _i -> assert false
-  | Papply _ -> assert false
+  | Pident _i -> None
+  | Papply _ -> None
   | Pdot(_p, _s) -> None
 
 module Shape_reduce = Shape.Make_reduce(struct
@@ -353,23 +353,23 @@ module Shape_reduce = Shape.Make_reduce(struct
 
 let uid_of_path ~env path =
   match split_path_by_compilation_unit path with
-  | None -> None
+  | None -> Printf.eprintf "none0\n"; None
   | Some (maybe_compilation_unit, subpath) ->
     match Ident.is_global maybe_compilation_unit with
     | false ->
       (match (Env.find_type path env) with
-      | exception Not_found -> None
+       | exception Not_found -> Printf.eprintf "none1\n"; None
       | type_ -> Some type_.type_uid
       )
     | true ->
       let filename = Ident.name maybe_compilation_unit |> String.uncapitalize_ascii in
       match Load_path.find_uncap (filename ^ ".cms") with
-      | exception Not_found -> None
+      | exception Not_found -> Format.eprintf "none2 %a\n" Format.pp_print_string filename; None
       | fn ->
         (* CR tnowak: exception? *)
         let cms_infos = Cms_format.read fn in
         match cms_infos.cms_impl_shape with
-        | None -> None
+        | None -> Printf.eprintf "none3\n"; None
         | Some shape ->
           match subpath with
           | Pident i ->
