@@ -327,12 +327,16 @@ let set_private_row env loc p decl =
 
 (* Translate one type declaration *)
 
-let split_path_by_compilation_unit (path : Path.t) =
+let rec split_type_path_at_compilation_unit (path : Path.t) =
   match path with
-  | Pdot(Pident i, s) -> Some (i, Path.Pident (Ident.create_local s))
-  | Pident _i -> None
-  | Papply _ -> None
-  | Pdot(_p, _s) -> None
+  | Pident _ | Papply _ -> None, path
+  | Pdot (Pident i, s) ->
+    if Ident.is_global i
+    then Some (Ident.name i), Path.Pident (Ident.create_local s)
+    else None, path
+  | Pdot (path, s) ->
+    let comp_unit, path = split_type_path_at_compilation_unit path in
+    comp_unit, Path.Pdot (path, s)
 
 module Shape_reduce = Shape.Make_reduce(struct
     type env = (*Shape.t Ident.Tbl.t*) unit
@@ -353,31 +357,29 @@ module Shape_reduce = Shape.Make_reduce(struct
   end)
 
 let uid_of_path ~env path =
-  match split_path_by_compilation_unit path with
-  | None -> None
-  | Some (maybe_compilation_unit, subpath) ->
-    match Ident.is_global maybe_compilation_unit with
-    | false ->
-      (match (Env.find_type path env) with
-       | exception Not_found -> None
-      | type_ -> Some type_.type_uid
-      )
-    | true ->
-      let filename = Ident.name maybe_compilation_unit |> String.uncapitalize_ascii in
-      match Load_path.find_uncap (filename ^ ".cms") with
+  let compilation_unit, path = split_type_path_at_compilation_unit path in
+  match compilation_unit with
+  | None ->
+    (match (Env.find_type path env) with
       | exception Not_found -> None
-      | fn ->
-        (* CR tnowak: exception? *)
-        let cms_infos = Cms_format.read fn in
-        match cms_infos.cms_impl_shape with
-        | None -> None
-        | Some shape ->
-          match subpath with
-          | Pident i ->
-            let shape = Shape.proj shape (Shape.Item.type_ i) in
-            let shape = Shape_reduce.reduce () shape in
-            shape.uid
-          | _ -> assert false
+    | type_ -> Some type_.type_uid
+    )
+  | Some compilation_unit ->
+    let filename = String.uncapitalize_ascii compilation_unit in
+    match Load_path.find_uncap (filename ^ ".cms") with
+    | exception Not_found -> None
+    | fn ->
+      (* CR tnowak: exception? *)
+      let cms_infos = Cms_format.read fn in
+      match cms_infos.cms_impl_shape with
+      | None -> None
+      | Some shape ->
+        match path with
+        | Pident i ->
+          let shape = Shape.proj shape (Shape.Item.type_ i) in
+          let shape = Shape_reduce.reduce () shape in
+          shape.uid
+        | _ -> assert false
 
 let transl_global_flags loc attrs =
   let transl_global_flag loc (r : (bool,unit) result) =
