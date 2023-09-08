@@ -327,35 +327,32 @@ let shapes_to_string (strings : string list) =
   | hd :: [] -> hd ^ " "
   | _ :: _ :: _ -> "(" ^ String.concat ", " strings ^ ") "
 
+(* CR tnowak: this is copy-pasted from typedecl.ml *)
+let rec split_type_path_at_compilation_unit (path : Path.t) =
+  match path with
+  | Pident _ | Papply _ -> None, path
+  | Pdot (Pident i, s) ->
+    if Ident.is_global i
+    then Some (Ident.name i), Path.Pident (Ident.create_local s)
+    else None, path
+  | Pdot (path, s) ->
+    let comp_unit, path = split_type_path_at_compilation_unit path in
+    comp_unit, Path.Pdot (path, s)
+
 let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
     ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
-  let path_s = Format.asprintf "%a" Path.print type_path in
-  let debug_uid_name = Format.asprintf "%a" Uid.print type_uid in
-  if path_s = "Env!.t"
-  then (
-    Format.eprintf "Path %a\n" Path.print type_path;
-    Format.eprintf "Trying to access %a\n" Format.pp_print_string debug_uid_name);
-  (*Format.eprintf "Trying to access %a\n" Format.pp_print_string
-    debug_uid_name;*)
-  (*let proper_env_uid = "Env.676" in*)
-  (*if debug_uid_name = proper_env_uid then*)
   let compilation_unit_type_decls =
-    match type_path with
-    | Pident _ -> Some all_type_decls
-    | Pdot (Pident compilation_unit, _type_name) -> (
+    match split_type_path_at_compilation_unit type_path with
+    | Some compilation_unit, _ ->
       (* CR tnowak: change the [String.lowercase_ascii] to a proper function. *)
-      let filename = Ident.name compilation_unit |> String.uncapitalize_ascii in
-      (*Format.eprintf "Finding cms file %a\n" Format.pp_print_string
-        filename;*)
-      match Load_path.find_uncap (filename ^ ".cms") with
+      let filename = compilation_unit |> String.uncapitalize_ascii in
+      (match Load_path.find_uncap (filename ^ ".cms") with
       | exception Not_found ->
-        (*Format.eprintf "Didn't find cms file %a\n" Format.pp_print_string
-          filename;*)
         None
       | fn ->
         let type_decls = load_decls_from_cms fn in
         Some type_decls)
-    | _ -> None
+    | None, _ -> Some all_type_decls
   in
   Option.bind compilation_unit_type_decls (fun tbl ->
       Uid.Tbl.find_opt tbl type_uid)

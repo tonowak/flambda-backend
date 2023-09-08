@@ -360,19 +360,22 @@ let uid_of_path ~env path =
   let compilation_unit, _path = split_type_path_at_compilation_unit path in
   match compilation_unit with
   | None ->
+    Format.eprintf "I'm in this root\n";
     (match (Env.find_type path env) with
-      | exception Not_found -> None
-    | type_ -> Some type_.type_uid
+      | exception Not_found -> Format.eprintf "None0\n"; None
+      | type_ -> let uid = type_.type_uid in
+        Format.eprintf "uid = %a\n" Uid.print uid;
+        Some uid
     )
   | Some compilation_unit ->
     let filename = String.uncapitalize_ascii compilation_unit in
     match Load_path.find_uncap (filename ^ ".cms") with
-    | exception Not_found -> None
+    | exception Not_found -> Format.eprintf "None1\n"; None
     | fn ->
       (* CR tnowak: exception? *)
       let cms_infos = Cms_format.read fn in
       match cms_infos.cms_impl_shape with
-      | None -> None
+      | None -> Format.eprintf "None2\n"; None
       | Some shape ->
         let shape =
           Shape.of_path
@@ -381,7 +384,9 @@ let uid_of_path ~env path =
             ~namespace:Type path
         in
         let shape = Shape_reduce.reduce () shape in
-        shape.uid
+        match shape.uid with
+        | None -> Format.eprintf "None3\n"; None
+        | Some uid -> Some uid
 
 let transl_global_flags loc attrs =
   let transl_global_flag loc (r : (bool,unit) result) =
