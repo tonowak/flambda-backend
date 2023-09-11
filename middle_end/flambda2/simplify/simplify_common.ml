@@ -192,7 +192,8 @@ let split_direct_over_application apply
       let handler_expr =
         Let.create
           (Bound_pattern.singleton
-             (Bound_var.create (Variable.create "unit") Name_mode.normal))
+             (Bound_var.create (Variable.create "unit")
+                Shape.Uid.internal_not_actually_unique Name_mode.normal))
           (Named.create_prim
              (Unary (End_region, Simple.var region))
              (Apply.dbg apply))
@@ -255,7 +256,9 @@ let split_direct_over_application apply
   | None -> both_applications
   | Some (region, _) ->
     Let.create
-      (Bound_pattern.singleton (Bound_var.create region Name_mode.normal))
+      (Bound_pattern.singleton
+         (Bound_var.create region Shape.Uid.internal_not_actually_unique
+            (* CR tnowak: verify *) Name_mode.normal))
       (Named.create_prim (Nullary Begin_region) (Apply.dbg apply))
       ~body:both_applications
       ~free_names_of_body:

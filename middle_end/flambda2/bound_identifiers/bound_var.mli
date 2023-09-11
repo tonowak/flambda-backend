@@ -19,9 +19,11 @@
 
 type t
 
-val create : Variable.t -> Name_mode.t -> t
+val create : Variable.t -> Shape.Uid.t -> Name_mode.t -> t
 
 val var : t -> Variable.t
+
+val uid : t -> Shape.Uid.t
 
 val name_mode : t -> Name_mode.t
 

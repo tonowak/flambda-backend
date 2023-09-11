@@ -284,7 +284,9 @@ let create_coerced_singleton_let uacc var defining_expr
         (* Generate [let uncoerced_var = <defining_expr>] *)
         let ((_body, _uacc, outer_result) as outer) =
           let bound =
-            Bound_pattern.singleton (VB.create uncoerced_var name_mode)
+            Bound_pattern.singleton
+              (VB.create uncoerced_var Shape.Uid.internal_not_actually_unique
+                 name_mode)
           in
           create_let uacc bound defining_expr ~free_names_of_defining_expr ~body
             ~cost_metrics_of_defining_expr
@@ -567,7 +569,8 @@ let create_let_symbols uacc lifted_constant ~body =
       let free_names_of_defining_expr = Named.free_names defining_expr in
       let expr, uacc, _ =
         create_coerced_singleton_let uacc
-          (VB.create var Name_mode.normal)
+          (* CR tnowak: verify *)
+          (VB.create var Shape.Uid.internal_not_actually_unique Name_mode.normal)
           defining_expr ~coercion_from_defining_expr_to_var
           ~free_names_of_defining_expr ~body:expr ~cost_metrics_of_defining_expr
       in

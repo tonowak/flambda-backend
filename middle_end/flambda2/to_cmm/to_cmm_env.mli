@@ -232,7 +232,7 @@ val bind_variable_to_primitive :
   ?extra:extra_info ->
   t ->
   To_cmm_result.t ->
-  Variable.t ->
+  Bound_var.t ->
   inline:'a inline ->
   defining_expr:'a bound_expr ->
   effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
@@ -244,7 +244,7 @@ val bind_variable :
   ?extra:extra_info ->
   t ->
   To_cmm_result.t ->
-  Variable.t ->
+  Bound_var.t ->
   defining_expr:Cmm.expression ->
   free_vars_of_defining_expr:free_vars ->
   num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
@@ -254,7 +254,7 @@ val bind_variable :
 val add_alias :
   t ->
   To_cmm_result.t ->
-  var:Variable.t ->
+  var:Bound_var.t ->
   alias_of:Variable.t ->
   num_normal_occurrences_of_bound_vars:Num_occurrences.t Variable.Map.t ->
   t * To_cmm_result.t
