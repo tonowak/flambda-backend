@@ -356,28 +356,32 @@ module Shape_reduce = Shape.Make_reduce(struct
     let find_shape _env _ident = (*Ident.Tbl.find env ident*) Shape.dummy_mod
   end)
 
+let debug = true
+
 let uid_of_path ~env path =
+  if debug then Format.eprintf "uid_of_path path=%a\n" Path.print path;
   let compilation_unit, _path = split_type_path_at_compilation_unit path in
   match compilation_unit with
   | None ->
-    Format.eprintf "I'm in this root\n";
+    if debug then Format.eprintf "I'm in this root\n";
     (match (Env.find_type path env) with
-      | exception Not_found -> Format.eprintf "None0\n"; None
+      | exception Not_found -> if debug then Format.eprintf "None0\n"; None
       | type_ -> let uid = type_.type_uid in
-        Format.eprintf "uid = %a\n" Uid.print uid;
+        if debug then Format.eprintf "uid = %a\n" Uid.print uid;
         Some uid
     )
   | Some compilation_unit ->
     let filename = String.uncapitalize_ascii compilation_unit in
     match Load_path.find_uncap (filename ^ ".cms") with
-    | exception Not_found -> Format.eprintf "None1\n"; None
+    | exception Not_found -> if debug then Format.eprintf "None1\n"; None
     | fn ->
       (* CR tnowak: exception? *)
       let cms_infos = Cms_format.read fn in
       match cms_infos.cms_impl_shape with
-      | None -> Format.eprintf "None2\n"; None
+      | None -> if debug then Format.eprintf "None2\n"; None
       | Some shape ->
         let shape =
+          (* CR tnowak: that might be wrong? *)
           Shape.of_path
             ~find_shape:(fun _sig_comp_kind ident ->
               assert (Ident.name ident = compilation_unit); shape)
@@ -385,8 +389,8 @@ let uid_of_path ~env path =
         in
         let shape = Shape_reduce.reduce () shape in
         match shape.uid with
-        | None -> Format.eprintf "None3\n"; None
-        | Some uid -> Some uid
+        | None -> if debug then Format.eprintf "None3\n"; None
+        | Some uid -> if debug then Format.eprintf "got it uid=%a\n" Uid.print uid; Some uid
 
 let transl_global_flags loc attrs =
   let transl_global_flag loc (r : (bool,unit) result) =

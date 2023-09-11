@@ -66,9 +66,11 @@ val find_in_type_decls :
   Uid.t ->
   Path.t ->
   load_decls_from_cms:(string -> Type_decl_shape.t Uid.Tbl.t) ->
-  Type_decl_shape.t option
+  current_compilation_unit:string option ->
+  Type_decl_shape.t option * string option
 
 val type_name :
   Type_shape.t ->
   load_decls_from_cms:(string -> Type_decl_shape.t Uid.Tbl.t) ->
+  current_compilation_unit:string option ->
   string

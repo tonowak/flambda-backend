@@ -179,6 +179,7 @@ module Type_decl_shape = struct
     let definition =
       match type_declaration.type_manifest with
       | Some type_expr ->
+        Format.eprintf "constructing an alias %a\n" Path.print path;
         Tds_alias (Type_shape.of_type_expr type_expr uid_of_path)
       | None -> (
         match type_declaration.type_kind with
@@ -260,7 +261,7 @@ module Type_decl_shape = struct
   let map_snd f list = List.map (fun (fst, snd) -> fst, f snd) list
 
   let replace_tvar (t : t) (shapes : Type_shape.t list) =
-    let debug = false in
+    let debug = true in
     if debug
     then
       Format.eprintf "replacing tvar %a; %a; %a\n%!" print t
@@ -339,40 +340,81 @@ let rec split_type_path_at_compilation_unit (path : Path.t) =
     let comp_unit, path = split_type_path_at_compilation_unit path in
     comp_unit, Path.Pdot (path, s)
 
+let debug = false
+
 let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
-    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
-  let compilation_unit_type_decls =
+    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t)
+    ~(current_compilation_unit : string option) =
+  if debug
+  then Format.eprintf "trying to find type_uid = %a\n" Uid.print type_uid;
+  if debug then Format.eprintf "splitting %a\n" Path.print type_path;
+  let current_compilation_unit =
     match split_type_path_at_compilation_unit type_path with
-    | Some compilation_unit, _ ->
+    | Some compilation_unit, _ -> Some compilation_unit
+    | None, _ -> current_compilation_unit
+  in
+  let compilation_unit_type_decls =
+    match current_compilation_unit with
+    | Some compilation_unit -> (
+      if debug
+      then
+        Format.eprintf "got compilation unit %a\n" Format.pp_print_string
+          compilation_unit;
       (* CR tnowak: change the [String.lowercase_ascii] to a proper function. *)
       let filename = compilation_unit |> String.uncapitalize_ascii in
-      (match Load_path.find_uncap (filename ^ ".cms") with
+      match Load_path.find_uncap (filename ^ ".cms") with
       | exception Not_found ->
+        if debug
+        then
+          Format.eprintf "not found filename %a" Format.pp_print_string filename;
         None
       | fn ->
         let type_decls = load_decls_from_cms fn in
         Some type_decls)
-    | None, _ -> Some all_type_decls
+    | None ->
+      if debug then Format.eprintf "same unit\n";
+      Some all_type_decls
   in
-  Option.bind compilation_unit_type_decls (fun tbl ->
-      Uid.Tbl.find_opt tbl type_uid)
+  ( Option.bind compilation_unit_type_decls (fun tbl ->
+        Uid.Tbl.find_opt tbl type_uid),
+    current_compilation_unit )
 
 let rec type_name (type_shape : Type_shape.t)
-    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
+    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t)
+    ~(current_compilation_unit : string option) =
   match type_shape with
   | Ts_predef (predef, shapes) ->
-    shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
+    shapes_to_string
+      (List.map
+         (type_name ~load_decls_from_cms ~current_compilation_unit)
+         shapes)
     ^ Type_shape.Predef.to_string predef
-  | Ts_other -> "unknown"
+  | Ts_other ->
+    if debug then Format.eprintf "unknown0\n";
+    "unknown"
   | Ts_tuple shapes ->
-    tuple_to_string (List.map (type_name ~load_decls_from_cms) shapes)
+    tuple_to_string
+      (List.map
+         (type_name ~load_decls_from_cms ~current_compilation_unit)
+         shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
   | Ts_constr ((type_uid, type_path), shapes) -> (
-    match find_in_type_decls type_uid type_path ~load_decls_from_cms with
-    | None | Some { definition = Tds_other; _ } -> "unknown"
-    | Some type_decl_shape ->
+    match
+      find_in_type_decls type_uid type_path ~load_decls_from_cms
+        ~current_compilation_unit
+    with
+    | None, _ ->
+      if debug then Format.eprintf "unknown2\n";
+      "unknown"
+    | Some { definition = Tds_other; _ }, _ ->
+      if debug then Format.eprintf "unknown1\n";
+      "unknown"
+    | Some type_decl_shape, current_compilation_unit ->
       let args =
-        shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
+        shapes_to_string
+          (List.map
+             (type_name ~load_decls_from_cms ~current_compilation_unit)
+             shapes)
       in
       let name_with_compilation_unit =
         (match type_decl_shape.compilation_unit with
