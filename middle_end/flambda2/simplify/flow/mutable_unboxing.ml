@@ -453,7 +453,8 @@ module Fold_prims = struct
               (fun i kind ->
                 let name = Variable.unique_name block_needed in
                 let var = Variable.create (Printf.sprintf "%s_%i" name i) in
-                Bound_parameter.create var kind Shape.Uid.internal_not_actually_unique
+                Bound_parameter.create var kind
+                  Shape.Uid.internal_not_actually_unique
                 (* CR tnowak: verify *))
               fields_kinds
           in

@@ -169,8 +169,10 @@ let split_direct_over_application apply
       let over_application_results =
         List.mapi
           (fun i kind ->
-             BP.create (Variable.create ("result" ^ string_of_int i)) kind
-               Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
+            BP.create
+              (Variable.create ("result" ^ string_of_int i))
+              kind
+              Shape.Uid.internal_not_actually_unique (* CR tnowak: verify *))
           (Flambda_arity.to_list (Apply.return_arity apply))
       in
       let call_return_continuation, call_return_continuation_free_names =
@@ -215,7 +217,10 @@ let split_direct_over_application apply
   in
   let after_full_application = Continuation.create () in
   let after_full_application_handler =
-    let func_param = BP.create func_var K.With_subkind.any_value Shape.Uid.internal_not_actually_unique (* CR tnowak: maybe? *)in
+    let func_param =
+      BP.create func_var K.With_subkind.any_value
+        Shape.Uid.internal_not_actually_unique (* CR tnowak: maybe? *)
+    in
     Continuation_handler.create
       (Bound_parameters.create [func_param])
       ~handler:perform_over_application

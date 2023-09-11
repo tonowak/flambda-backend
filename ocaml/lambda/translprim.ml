@@ -800,7 +800,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         | Some [exn_exp; _] -> event_after loc exn_exp (Lvar vexn)
         | Some _ -> assert false
       in
-      Llet(Strict, Lambda.layout_block, vexn, exn,
+      Llet(Strict, Lambda.layout_block, vexn, Uid.internal_not_actually_unique, exn,
            Lsequence(Lprim(Pccall caml_restore_raw_backtrace,
                            [Lvar vexn; bt],
                            loc),

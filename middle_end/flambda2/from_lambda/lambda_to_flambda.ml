@@ -617,11 +617,13 @@ let transform_primitive env (prim : L.primitive) args loc =
          ( Strict,
            Lambda.layout_int,
            const_true,
+           Shape.Uid.internal_not_actually_unique,
            Lconst (Const_base (Const_int 1)),
            L.Llet
              ( Strict,
                Lambda.layout_int,
                cond,
+               Shape.Uid.internal_not_actually_unique,
                arg1,
                switch_for_if_then_else ~cond:(L.Lvar cond)
                  ~ifso:(L.Lvar const_true) ~ifnot:arg2 ~kind:Lambda.layout_int
@@ -634,11 +636,13 @@ let transform_primitive env (prim : L.primitive) args loc =
          ( Strict,
            Lambda.layout_int,
            const_false,
+           Shape.Uid.internal_not_actually_unique,
            Lconst (Const_base (Const_int 0)),
            L.Llet
              ( Strict,
                Lambda.layout_int,
                cond,
+               Shape.Uid.internal_not_actually_unique,
                arg1,
                switch_for_if_then_else ~cond:(L.Lvar cond) ~ifso:arg2
                  ~ifnot:(L.Lvar const_false) ~kind:Lambda.layout_int ) ))
@@ -725,6 +729,7 @@ let rec_catch_for_while_loop env cond body =
           ( Strict,
             Lambda.layout_int,
             cond_result,
+            Shape.Uid.internal_not_actually_unique,
             cond,
             Lifthenelse
               ( Lvar cond_result,
@@ -765,17 +770,22 @@ let rec_catch_for_for_loop env ident start stop (dir : Asttypes.direction_flag)
       ( Strict,
         Lambda.layout_int,
         start_ident,
+        Shape.Uid.internal_not_actually_unique,
         start,
         Llet
           ( Strict,
             Lambda.layout_int,
             stop_ident,
+            Shape.Uid.internal_not_actually_unique,
             stop,
             Lifthenelse
               ( first_test,
                 Lstaticcatch
                   ( Lstaticraise (cont, [L.Lvar start_ident]),
-                    (cont, [ident, Lambda.layout_int]),
+                    ( cont,
+                      [ ( ident,
+                          Shape.Uid.internal_not_actually_unique,
+                          Lambda.layout_int ) ] ),
                     Lsequence
                       ( body,
                         Lifthenelse
@@ -1075,7 +1085,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let body acc ccenv = apply_cps_cont k ~dbg acc env ccenv id in
     CC.close_let_rec acc ccenv ~function_declarations:[func] ~body
       ~current_region:(Env.current_region env)
-  | Lmutlet (value_kind, id, defining_expr, body) ->
+  | Lmutlet (value_kind, id, uid, defining_expr, body) ->
     (* CR mshinwell: user-visibleness needs thinking about here *)
     let temp_id = Ident.create_local "let_mutable" in
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
@@ -1089,9 +1099,12 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         CC.close_let acc ccenv
           [new_id, kind]
           User_visible (Simple (Var temp_id)) ~body)
-  | Llet ((Strict | Alias | StrictOpt), _, fun_id, Lfunction func, body) ->
+  | Llet ((Strict | Alias | StrictOpt), _, fun_id, fun_uid, Lfunction func, body)
+    ->
     (* This case is here to get function names right. *)
-    let bindings = cps_function_bindings env [fun_id, L.Lfunction func] in
+    let bindings =
+      cps_function_bindings env [fun_id, fun_uid, L.Lfunction func]
+    in
     let body acc ccenv = cps acc env ccenv body k k_exn in
     let let_expr =
       List.fold_left
@@ -1101,7 +1114,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         body bindings
     in
     let_expr acc ccenv
-  | Llet ((Strict | Alias | StrictOpt), layout, id, Lconst const, body) ->
+  | Llet ((Strict | Alias | StrictOpt), layout, id, uid, Lconst const, body) ->
     (* This case avoids extraneous continuations. *)
     let body acc ccenv = cps acc env ccenv body k k_exn in
     CC.close_let acc ccenv
@@ -1111,6 +1124,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
       ( ((Strict | Alias | StrictOpt) as let_kind),
         layout,
         id,
+        uid,
         Lprim (prim, args, loc),
         body ) -> (
     match transform_primitive env prim args loc with
@@ -1137,11 +1151,12 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             ~body)
         k_exn
     | Transformed lam ->
-      cps acc env ccenv (L.Llet (let_kind, layout, id, lam, body)) k k_exn)
+      cps acc env ccenv (L.Llet (let_kind, layout, id, uid, lam, body)) k k_exn)
   | Llet
       ( (Strict | Alias | StrictOpt),
         _,
         id,
+        uid,
         Lassign (being_assigned, new_value),
         body ) ->
     (* This case is also to avoid extraneous continuations in code that relies
@@ -1167,7 +1182,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           [new_id, value_kind]
           User_visible (Simple new_value) ~body)
       k_exn
-  | Llet ((Strict | Alias | StrictOpt), layout, id, defining_expr, body) ->
+  | Llet ((Strict | Alias | StrictOpt), layout, id, uid, defining_expr, body) ->
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
       ~params:[id, is_user_visible env id, layout]
       ~body:(fun acc env ccenv after_defining_expr ->
@@ -1188,7 +1203,12 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         (Flambda_kind.to_lambda
            (Flambda_kind.With_subkind.kind kind_with_subkind))
     in
-    match Dissect_letrec.dissect_letrec ~bindings ~body ~free_vars_kind with
+    (* CR tnowak: probably invalid *)
+    let bindings_letrec = List.map (fun (id, uid, l) -> id, l) bindings in
+    match
+      Dissect_letrec.dissect_letrec ~bindings:bindings_letrec ~body
+        ~free_vars_kind
+    with
     | Unchanged ->
       let function_declarations = cps_function_bindings env bindings in
       let body acc ccenv = cps acc env ccenv body k k_exn in
@@ -1217,6 +1237,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     | _ ->
       let name = Printlambda.name_of_primitive prim in
       let id = Ident.create_local name in
+      (* CR tnowak: verify *)
+      let uid = Shape.Uid.internal_not_actually_unique in
       let result_layout = L.primitive_result_layout prim in
       (match result_layout with
       | Pvalue _ | Punboxed_float | Punboxed_int _ | Punboxed_vector _ -> ()
@@ -1224,7 +1246,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         Misc.fatal_errorf "Invalid result layout %a for primitive %a"
           Printlambda.layout result_layout Printlambda.primitive prim);
       cps acc env ccenv
-        (L.Llet (Strict, result_layout, id, lam, L.Lvar id))
+        (L.Llet (Strict, result_layout, id, uid, lam, L.Lvar id))
         k k_exn)
   | Lswitch (scrutinee, switch, loc, kind) ->
     maybe_insert_let_cont "switch_result" kind k acc env ccenv
@@ -1259,6 +1281,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           then Recursive
           else Nonrecursive
         in
+        (* CR tnowak: probably invalid *)
+        let args = List.map (fun (id, uid, l) -> id, l) args in
         let params =
           List.map
             (fun (arg, kind) ->
@@ -1551,22 +1575,25 @@ and cps_non_tail_list_core acc env ccenv (lams : L.lambda list)
           k_exn)
       k_exn
 
-and cps_function_bindings env (bindings : (Ident.t * L.lambda) list) =
+and fst3 (a, _, _) = a
+
+and cps_function_bindings env
+    (bindings : (Ident.t * Shape.Uid.t * L.lambda) list) =
   let bindings_with_wrappers =
     List.map
-      (fun [@ocaml.warning "-fragile-match"] (fun_id, binding) ->
+      (fun [@ocaml.warning "-fragile-match"] (fun_id, fun_uid, binding) ->
         match binding with
         | L.Lfunction
             { kind; params; body = fbody; attr; loc; mode; region; return; _ }
           -> (
           match
-            Simplif.split_default_wrapper ~id:fun_id ~kind ~params ~body:fbody
-              ~return ~attr ~loc ~mode ~region
+            Simplif.split_default_wrapper ~id:fun_id ~uid:fun_uid ~kind ~params
+              ~body:fbody ~return ~attr ~loc ~mode ~region
           with
-          | [(id, L.Lfunction lfun)] -> [id, lfun]
-          | [(id1, L.Lfunction lfun1); (id2, L.Lfunction lfun2)] ->
+          | [(id, uid, L.Lfunction lfun)] -> [id, lfun]
+          | [(id1, uid1, L.Lfunction lfun1); (id2, uid2, L.Lfunction lfun2)] ->
             [id1, lfun1; id2, lfun2]
-          | [(_, _)] | [(_, _); (_, _)] ->
+          | [(_, _, _)] | [(_, _, _); (_, _, _)] ->
             Misc.fatal_errorf
               "Expected `Lfunction` terms from [split_default_wrapper] when \
                translating:@ %a"
@@ -1584,7 +1611,7 @@ and cps_function_bindings env (bindings : (Ident.t * L.lambda) list) =
       bindings
   in
   let free_idents, directed_graph =
-    let fun_ids = Ident.Set.of_list (List.map fst bindings) in
+    let fun_ids = Ident.Set.of_list (List.map fst3 bindings) in
     List.fold_left
       (fun (free_ids, graph) (fun_id, ({ body; _ } : L.lfunction)) ->
         let free_ids_of_body = Lambda.free_variables body in

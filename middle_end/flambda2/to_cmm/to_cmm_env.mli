@@ -132,7 +132,7 @@ val exported_offsets : t -> Exported_offsets.t
     the new environment and the created variable. Will produce a fatal error if
     the given variable is already bound. *)
 val create_bound_parameter :
-  t -> (Variable.t * Shape.Uid.t) -> t * Backend_var.With_provenance.t
+  t -> Variable.t * Shape.Uid.t -> t * Backend_var.With_provenance.t
 
 (** Same as {!create_variable} but for a list of variables. *)
 val create_bound_parameters :

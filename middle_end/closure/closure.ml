@@ -1035,7 +1035,7 @@ let rec close ({ backend; fenv; cenv ; mutable_vars; kinds; catch_env } as env) 
       in
       make_const (transl cst)
   | Lfunction _ as funct ->
-      close_one_function env (Ident.create_local "fun") funct
+      close_one_function env (Ident.create_local "fun") Uid.internal_not_actually_unique funct
 
     (* We convert [f a] to [let a' = a in let f' = f in fun b c -> f' a' b c]
        when fun_arity > nargs *)
@@ -1215,8 +1215,8 @@ let rec close ({ backend; fenv; cenv ; mutable_vars; kinds; catch_env } as env) 
       let args_layout = List.map (compute_expr_layout kinds) args in
       (Usend(kind, umet, uobj, close_list env args, args_layout, result_layout, (pos,mode), dbg),
        Value_unknown)
-  | Llet(str, kind, id, lam, body) ->
-      let (ulam, alam) = close_named env id lam in
+  | Llet(str, kind, id, uid, lam, body) ->
+      let (ulam, alam) = close_named env id uid lam in
       let kinds = V.Map.add id kind kinds in
       begin match alam with
       | Value_const _
@@ -1244,15 +1244,15 @@ let rec close ({ backend; fenv; cenv ; mutable_vars; kinds; catch_env } as env) 
           in
           (Ulet(Immutable, kind, VP.create id, ulam, ubody), abody)
       end
-  | Lmutlet(kind, id, lam, body) ->
-     let (ulam, _) = close_named env id lam in
+  | Lmutlet(kind, id, uid, lam, body) ->
+     let (ulam, _) = close_named env id uid lam in
      let kinds = V.Map.add id kind kinds in
      let env = {env with mutable_vars = V.Set.add id env.mutable_vars} in
      let (ubody, abody) = close { env with kinds } body in
      (Ulet(Mutable, kind, VP.create id, ulam, ubody), abody)
   | Lletrec(defs, body) ->
       if List.for_all
-           (function (_id, Lfunction _) -> true | _ -> false)
+           (function (_id, _uid, Lfunction _) -> true | _ -> false)
            defs
       then begin
         (* Simple case: only function definitions *)
@@ -1290,14 +1290,14 @@ let rec close ({ backend; fenv; cenv ; mutable_vars; kinds; catch_env } as env) 
       end else begin
         (* General case: recursive definition of values *)
         let kinds =
-          List.fold_left (fun kinds (id, _) -> V.Map.add id Lambda.layout_letrec kinds)
+          List.fold_left (fun kinds (id, _uid, _) -> V.Map.add id Lambda.layout_letrec kinds)
             kinds defs
         in
         let rec clos_defs = function
           [] -> ([], fenv)
-        | (id, lam) :: rem ->
+        | (id, uid, lam) :: rem ->
             let (udefs, fenv_body) = clos_defs rem in
-            let (ulam, approx) = close_named { env with kinds } id lam in
+            let (ulam, approx) = close_named { env with kinds } id uid lam in
             ((VP.create id, ulam) :: udefs, V.Map.add id approx fenv_body) in
         let (udefs, fenv_body) = clos_defs defs in
         let (ubody, approx) =
@@ -1420,10 +1420,10 @@ let rec close ({ backend; fenv; cenv ; mutable_vars; kinds; catch_env } as env) 
       let body_env = { env with catch_env = Int.Map.add i new_i catch_env } in
       let (ubody, _) = close body_env body in
       let kinds =
-        List.fold_left (fun kinds (var, k) -> V.Map.add var k kinds) kinds vars
+        List.fold_left (fun kinds (var, _uid, k) -> V.Map.add var k kinds) kinds vars
       in
       let (uhandler, _) = close { env with kinds } handler in
-      let vars = List.map (fun (var, k) -> VP.create var, k) vars in
+      let vars = List.map (fun (var, _uid, k) -> VP.create var, k) vars in
       (Ucatch(new_i, vars, ubody, uhandler, kind), Value_unknown)
   | Ltrywith(body, id, handler, kind) ->
       let (ubody, _) = close env body in
@@ -1483,9 +1483,9 @@ and close_list_approx env = function
       let (ulams, approxs) = close_list_approx env rem in
       (ulam :: ulams, approx :: approxs)
 
-and close_named env id = function
+and close_named env id uid = function
     Lfunction _ as funct ->
-      close_one_function env id funct
+      close_one_function env id uid funct
   | lam ->
       close env lam
 
@@ -1496,16 +1496,16 @@ and close_functions { backend; fenv; cenv; mutable_vars; kinds; catch_env } fun_
     List.flatten
       (List.map
          (function
-           | (id, Lfunction{kind; params; return; body; attr;
+           | (id, uid, Lfunction{kind; params; return; body; attr;
                             loc; mode; region}) ->
-               Simplif.split_default_wrapper ~id ~kind ~params ~mode ~region
+               Simplif.split_default_wrapper ~id ~uid ~kind ~params ~mode ~region
                  ~body ~attr ~loc ~return
            | _ -> assert false
          )
          fun_defs)
   in
   let inline_attribute = match fun_defs with
-    | [_, Lfunction{attr = { inline; }}] -> inline
+    | [_, _, Lfunction{attr = { inline; }}] -> inline
     | _ -> Default_inline (* recursive functions can't be inlined *)
   in
   (* Update and check nesting depth *)
@@ -1523,7 +1523,7 @@ and close_functions { backend; fenv; cenv; mutable_vars; kinds; catch_env } fun_
   let uncurried_defs =
     List.map
       (function
-          (id, Lfunction(
+          (id, uid, Lfunction(
               {kind; params; return; body; attr; loc; mode; region})) ->
             let attrib = attr.check in
             let label =
@@ -1546,7 +1546,7 @@ and close_functions { backend; fenv; cenv; mutable_vars; kinds; catch_env } fun_
             let dbg = Debuginfo.from_location loc in
             (id, List.map (fun (p : Lambda.lparam) -> let No_attributes = p.attributes in (p.name, p.layout, p.mode)) params,
              return, body, mode, attrib, fundesc, dbg)
-        | (_, _) -> fatal_error "Closure.close_functions")
+        | (_, _, _) -> fatal_error "Closure.close_functions")
       fun_defs in
   (* Build an approximate fenv for compiling the functions *)
   let fenv_rec =
@@ -1693,8 +1693,8 @@ and close_functions { backend; fenv; cenv; mutable_vars; kinds; catch_env } fun_
 
 (* Same, for one non-recursive function *)
 
-and close_one_function env id funct =
-  match close_functions env [id, funct] with
+and close_one_function env id uid funct =
+  match close_functions env [id, uid, funct] with
   | (clos, (i, _, approx) :: _) when id = i -> (clos, approx)
   | _ -> fatal_error "Closure.close_one_function"
 

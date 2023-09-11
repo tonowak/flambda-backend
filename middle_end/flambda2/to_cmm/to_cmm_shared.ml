@@ -205,8 +205,8 @@ let simple_list ?consider_inlining_effectful_expressions ~dbg env res l =
   List.rev args, free_vars, env, res, effs
 
 let bound_parameters env l =
-  let env, cmm_vars = To_cmm_env.create_bound_parameters env
-    (Bound_parameters.vars_and_uids l)
+  let env, cmm_vars =
+    To_cmm_env.create_bound_parameters env (Bound_parameters.vars_and_uids l)
   in
   let vars =
     List.map2
