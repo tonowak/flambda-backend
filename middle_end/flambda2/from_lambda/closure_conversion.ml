@@ -416,7 +416,8 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
   in
   let env, let_bound_vars =
     List.fold_left_map
-      (fun env (id, kind) -> Env.add_var_like env id Not_user_visible kind)
+      (fun env (id, _uid, kind) ->
+        Env.add_var_like env id Not_user_visible kind)
       env let_bound_ids_with_kinds
   in
   let let_bound_var =
@@ -897,7 +898,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
   let rec cont ids_with_kinds env acc (defining_exprs : Named.t list) =
     match ids_with_kinds, defining_exprs with
     | [], [] -> body acc env
-    | (id, kind) :: ids_with_kinds, defining_expr :: defining_exprs -> (
+    | (id, uid, kind) :: ids_with_kinds, defining_expr :: defining_exprs -> (
       let body_env, var = Env.add_var_like env id user_visible kind in
       let body acc env = cont ids_with_kinds env acc defining_exprs in
       match defining_expr with
@@ -1077,9 +1078,7 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
   let handler_env, env_params = Env.add_vars_like env params in
   let handler_params =
     List.map2
-      (fun param (_, _, kind) ->
-        BP.create param kind Shape.Uid.internal_not_actually_unique
-        (* CR tnowak: that's probably the place *))
+      (fun param (_, uid, _, kind) -> BP.create param kind uid)
       env_params params
     |> Bound_parameters.create
   in
@@ -1089,7 +1088,7 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
       | None -> handler_env
       | Some args ->
         List.fold_left2
-          (fun env arg_approx (param, (param_id, _, kind)) ->
+          (fun env arg_approx (param, (param_id, param_uid, _, kind)) ->
             let env = Env.add_var_approximation env param arg_approx in
             match (arg_approx : Env.value_approximation) with
             | Value_symbol s | Closure_approximation { symbol = Some s; _ } ->
@@ -2118,7 +2117,8 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
       Ident.print apply.IR.func
       (Debuginfo.Scoped_location.string_of_scoped_location apply.IR.loc);
   let function_declarations =
-    [ Function_decl.create ~let_rec_ident:(Some wrapper_id) ~function_slot
+    [ Function_decl.create ~let_rec_ident:(Some wrapper_id)
+        ~let_rec_uid:Shape.Uid.internal_not_actually_unique ~function_slot
         ~kind:
           (Lambda.Curried
              { nlocal =

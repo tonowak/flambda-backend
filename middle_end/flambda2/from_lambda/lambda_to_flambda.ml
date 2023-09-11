@@ -571,6 +571,7 @@ let compile_staticfail acc env ccenv ~(continuation : Continuation.t) ~args :
         | Regular region_ident ->
           CC.close_let acc ccenv
             [ ( Ident.create_local "unit",
+                Shape.Uid.internal_not_actually_unique,
                 Flambda_kind.With_subkind.tagged_immediate ) ]
             Not_user_visible (End_region region_ident) ~body
     in
@@ -823,14 +824,18 @@ let let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler
   in
   let params =
     List.map
-      (fun (id, visible, kind) ->
-        id, visible, Flambda_kind.With_subkind.from_lambda kind)
+      (fun (id, uid, visible, kind) ->
+        id, uid, visible, Flambda_kind.With_subkind.from_lambda kind)
       params
   in
   let extra_params =
     List.map
       (fun (id, kind) ->
-        id, is_user_visible env id, Flambda_kind.With_subkind.from_lambda kind)
+        (* CR tnowak: verify *)
+        ( id,
+          Shape.Uid.internal_not_actually_unique,
+          is_user_visible env id,
+          Flambda_kind.With_subkind.from_lambda kind ))
       extra_params
   in
   let handler acc ccenv = handler acc handler_env ccenv in
@@ -848,7 +853,9 @@ let restore_continuation_context acc env ccenv cont ~close_early body =
     if close_early
     then
       CC.close_let acc ccenv
-        [Ident.create_local "unit", Flambda_kind.With_subkind.tagged_immediate]
+        [ ( Ident.create_local "unit",
+            Shape.Uid.internal_not_actually_unique,
+            Flambda_kind.With_subkind.tagged_immediate ) ]
         Not_user_visible (End_region region)
         ~body:(fun acc ccenv -> body acc ccenv cont)
     else
@@ -928,7 +935,11 @@ let wrap_return_continuation acc env ccenv (apply : IR.apply) =
             Ident.print apply.func
       in
       CC.close_let_cont acc ccenv ~name:wrapper_cont ~is_exn_handler:false
-        ~params:[return_value, Not_user_visible, return_arity]
+        ~params:
+          [ ( return_value,
+              Shape.Uid.internal_not_actually_unique,
+              Not_user_visible,
+              return_arity ) ]
         ~recursive:Nonrecursive ~body ~handler
   in
   restore_continuation_context acc env ccenv apply.continuation ~close_early
@@ -1035,7 +1046,11 @@ let maybe_insert_let_cont result_var_name kind k acc env ccenv body =
   | Non_tail k ->
     let result_var = Ident.create_local result_var_name in
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
-      ~params:[result_var, IR.Not_user_visible, kind]
+      ~params:
+        [ ( result_var,
+            Shape.Uid.internal_not_actually_unique,
+            IR.Not_user_visible,
+            kind ) ]
       ~handler:(fun acc env ccenv -> k acc env ccenv (IR.Var result_var))
       ~body
 
@@ -1044,8 +1059,9 @@ let name_if_not_var acc ccenv name simple kind body =
   | IR.Var id -> body id acc ccenv
   | IR.Const _ ->
     let id = Ident.create_local name in
+    let uid = Shape.Uid.internal_not_actually_unique in
     CC.close_let acc ccenv
-      [id, kind]
+      [id, uid, kind]
       Not_user_visible (IR.Simple simple) ~body:(body id)
 
 let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
@@ -1080,16 +1096,23 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let id = Ident.create_local (name_for_function func) in
     let dbg = Debuginfo.from_location func.loc in
     let func =
-      cps_function env ~fid:id ~recursive:(Non_recursive : Recursive.t) func
+      cps_function env ~fid:id ~fuid:Shape.Uid.internal_not_actually_unique
+        ~recursive:(Non_recursive : Recursive.t)
+        func
     in
     let body acc ccenv = apply_cps_cont k ~dbg acc env ccenv id in
     CC.close_let_rec acc ccenv ~function_declarations:[func] ~body
       ~current_region:(Env.current_region env)
-  | Lmutlet (value_kind, id, uid, defining_expr, body) ->
+  | Lmutlet (value_kind, id, _uid, defining_expr, body) ->
     (* CR mshinwell: user-visibleness needs thinking about here *)
+    (* CR tnowak: what to do with the uid? *)
     let temp_id = Ident.create_local "let_mutable" in
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
-      ~params:[temp_id, IR.Not_user_visible, value_kind]
+      ~params:
+        [ ( temp_id,
+            Shape.Uid.internal_not_actually_unique,
+            IR.Not_user_visible,
+            value_kind ) ]
       ~body:(fun acc env ccenv after_defining_expr ->
         cps_tail acc env ccenv defining_expr after_defining_expr k_exn)
       ~handler:(fun acc env ccenv ->
@@ -1097,7 +1120,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         let kind = Flambda_kind.With_subkind.from_lambda value_kind in
         let body acc ccenv = cps acc env ccenv body k k_exn in
         CC.close_let acc ccenv
-          [new_id, kind]
+          [new_id, Shape.Uid.internal_not_actually_unique, kind]
           User_visible (Simple (Var temp_id)) ~body)
   | Llet ((Strict | Alias | StrictOpt), _, fun_id, fun_uid, Lfunction func, body)
     ->
@@ -1118,7 +1141,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     (* This case avoids extraneous continuations. *)
     let body acc ccenv = cps acc env ccenv body k k_exn in
     CC.close_let acc ccenv
-      [id, Flambda_kind.With_subkind.from_lambda layout]
+      [id, uid, Flambda_kind.With_subkind.from_lambda layout]
       (is_user_visible env id) (Simple (Const const)) ~body
   | Llet
       ( ((Strict | Alias | StrictOpt) as let_kind),
@@ -1145,7 +1168,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           let body acc ccenv = cps acc env ccenv body k k_exn in
           let region = Env.current_region env in
           CC.close_let acc ccenv
-            [id, Flambda_kind.With_subkind.from_lambda layout]
+            [id, uid, Flambda_kind.With_subkind.from_lambda layout]
             (is_user_visible env id)
             (Prim { prim; args; loc; exn_continuation; region })
             ~body)
@@ -1171,7 +1194,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         let body acc ccenv =
           let body acc ccenv = cps acc env ccenv body k k_exn in
           CC.close_let acc ccenv
-            [id, Flambda_kind.With_subkind.tagged_immediate]
+            [id, uid, Flambda_kind.With_subkind.tagged_immediate]
             Not_user_visible (Simple (Const L.const_unit)) ~body
         in
         let value_kind =
@@ -1179,12 +1202,12 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         in
         let value_kind = Flambda_kind.With_subkind.from_lambda value_kind in
         CC.close_let acc ccenv
-          [new_id, value_kind]
+          [new_id, Shape.Uid.internal_not_actually_unique, value_kind]
           User_visible (Simple new_value) ~body)
       k_exn
   | Llet ((Strict | Alias | StrictOpt), layout, id, uid, defining_expr, body) ->
     let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler:false
-      ~params:[id, is_user_visible env id, layout]
+      ~params:[id, uid, is_user_visible env id, layout]
       ~body:(fun acc env ccenv after_defining_expr ->
         cps_tail acc env ccenv defining_expr after_defining_expr k_exn)
       ~handler:(fun acc env ccenv -> cps acc env ccenv body k k_exn)
@@ -1203,12 +1226,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         (Flambda_kind.to_lambda
            (Flambda_kind.With_subkind.kind kind_with_subkind))
     in
-    (* CR tnowak: probably invalid *)
-    let bindings_letrec = List.map (fun (id, uid, l) -> id, l) bindings in
-    match
-      Dissect_letrec.dissect_letrec ~bindings:bindings_letrec ~body
-        ~free_vars_kind
-    with
+    match Dissect_letrec.dissect_letrec ~bindings ~body ~free_vars_kind with
     | Unchanged ->
       let function_declarations = cps_function_bindings env bindings in
       let body acc ccenv = cps acc env ccenv body k k_exn in
@@ -1281,12 +1299,17 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
           then Recursive
           else Nonrecursive
         in
-        (* CR tnowak: probably invalid *)
-        let args = List.map (fun (id, uid, l) -> id, l) args in
+        (* CR tnowak: verify *)
+        let extra_params =
+          List.map
+            (fun (id, l) -> id, Shape.Uid.internal_not_actually_unique, l)
+            extra_params
+        in
         let params =
           List.map
-            (fun (arg, kind) ->
+            (fun (arg, uid, kind) ->
               ( arg,
+                uid,
                 is_user_visible env arg,
                 Flambda_kind.With_subkind.from_lambda kind ))
             (args @ extra_params)
@@ -1357,7 +1380,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
        be behind a branch. *)
     let ccenv = CCenv.set_not_at_toplevel ccenv in
     CC.close_let acc ccenv
-      [region, Flambda_kind.With_subkind.region]
+      [ ( region,
+          Shape.Uid.internal_not_actually_unique,
+          Flambda_kind.With_subkind.region ) ]
       Not_user_visible
       (Begin_region { try_region_parent = Some (Env.current_region env) })
       ~body:(fun acc ccenv ->
@@ -1366,11 +1391,20 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             let env = Env.entering_try_region env region in
             let_cont_nonrecursive_with_extra_params acc env ccenv
               ~is_exn_handler:true
-              ~params:[id, is_user_visible env id, Lambda.layout_block]
+              ~params:
+                [ ( id,
+                    Shape.Uid.internal_not_actually_unique
+                    (* CR tnowak: verify) *),
+                    is_user_visible env id,
+                    Lambda.layout_block ) ]
               ~body:(fun acc env ccenv handler_continuation ->
                 let_cont_nonrecursive_with_extra_params acc env ccenv
                   ~is_exn_handler:false
-                  ~params:[body_result, Not_user_visible, kind]
+                  ~params:
+                    [ ( body_result,
+                        Shape.Uid.internal_not_actually_unique,
+                        Not_user_visible,
+                        kind ) ]
                   ~body:(fun acc env ccenv poptrap_continuation ->
                     let_cont_nonrecursive_with_extra_params acc env ccenv
                       ~is_exn_handler:false ~params:[]
@@ -1390,6 +1424,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               ~handler:(fun acc env ccenv ->
                 CC.close_let acc ccenv
                   [ ( Ident.create_local "unit",
+                      Shape.Uid.internal_not_actually_unique,
                       Flambda_kind.With_subkind.tagged_immediate ) ]
                   Not_user_visible (End_region region)
                   ~body:(fun acc ccenv ->
@@ -1430,7 +1465,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
         in
         let value_kind = Flambda_kind.With_subkind.from_lambda value_kind in
         CC.close_let acc ccenv
-          [new_id, value_kind]
+          [new_id, Shape.Uid.internal_not_actually_unique, value_kind]
           User_visible (Simple new_value) ~body)
       k_exn
   | Levent (body, _event) -> cps acc env ccenv body k k_exn
@@ -1446,7 +1481,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
   | Lexclave body ->
     let region = Env.current_region env in
     CC.close_let acc ccenv
-      [Ident.create_local "unit", Flambda_kind.With_subkind.tagged_immediate]
+      [ ( Ident.create_local "unit",
+          Shape.Uid.internal_not_actually_unique,
+          Flambda_kind.With_subkind.tagged_immediate ) ]
       Not_user_visible (End_region region)
       ~body:(fun acc ccenv ->
         let env = Env.leaving_region env in
@@ -1458,7 +1495,9 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     let region = Ident.create_local "region" in
     let dbg = Debuginfo.none in
     CC.close_let acc ccenv
-      [region, Flambda_kind.With_subkind.region]
+      [ ( region,
+          Shape.Uid.internal_not_actually_unique,
+          Flambda_kind.With_subkind.region ) ]
       Not_user_visible
       (Begin_region { try_region_parent = None })
       ~body:(fun acc ccenv ->
@@ -1467,7 +1506,11 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
             let wrap_return = Ident.create_local "region_return" in
             let_cont_nonrecursive_with_extra_params acc env ccenv
               ~is_exn_handler:false
-              ~params:[wrap_return, Not_user_visible, layout]
+              ~params:
+                [ ( wrap_return,
+                    Shape.Uid.internal_not_actually_unique,
+                    Not_user_visible,
+                    layout ) ]
               ~body:(fun acc env ccenv continuation_closing_region ->
                 (* We register this region to be closed by the newly-created
                    region closure continuation. When we reach a point in [body]
@@ -1497,6 +1540,7 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
               ~handler:(fun acc env ccenv ->
                 CC.close_let acc ccenv
                   [ ( Ident.create_local "unit",
+                      Shape.Uid.internal_not_actually_unique,
                       Flambda_kind.With_subkind.tagged_immediate ) ]
                   Not_user_visible (End_region region)
                   ~body:(fun acc ccenv ->
@@ -1579,7 +1623,8 @@ and fst3 (a, _, _) = a
 
 and cps_function_bindings env
     (bindings : (Ident.t * Shape.Uid.t * L.lambda) list) =
-  let bindings_with_wrappers =
+  let (bindings_with_wrappers : (Ident.t * Shape.Uid.t * L.lfunction) list list)
+      =
     List.map
       (fun [@ocaml.warning "-fragile-match"] (fun_id, fun_uid, binding) ->
         match binding with
@@ -1590,9 +1635,9 @@ and cps_function_bindings env
             Simplif.split_default_wrapper ~id:fun_id ~uid:fun_uid ~kind ~params
               ~body:fbody ~return ~attr ~loc ~mode ~region
           with
-          | [(id, uid, L.Lfunction lfun)] -> [id, lfun]
+          | [(id, uid, L.Lfunction lfun)] -> [id, uid, lfun]
           | [(id1, uid1, L.Lfunction lfun1); (id2, uid2, L.Lfunction lfun2)] ->
-            [id1, lfun1; id2, lfun2]
+            [id1, uid1, lfun1; id2, uid2, lfun2]
           | [(_, _, _)] | [(_, _, _); (_, _, _)] ->
             Misc.fatal_errorf
               "Expected `Lfunction` terms from [split_default_wrapper] when \
@@ -1613,7 +1658,7 @@ and cps_function_bindings env
   let free_idents, directed_graph =
     let fun_ids = Ident.Set.of_list (List.map fst3 bindings) in
     List.fold_left
-      (fun (free_ids, graph) (fun_id, ({ body; _ } : L.lfunction)) ->
+      (fun (free_ids, graph) (fun_id, _fun_uid, ({ body; _ } : L.lfunction)) ->
         let free_ids_of_body = Lambda.free_variables body in
         let free_ids = Ident.Map.add fun_id free_ids_of_body free_ids in
         let free_fun_ids = Ident.Set.inter fun_ids free_ids_of_body in
@@ -1641,13 +1686,14 @@ and cps_function_bindings env
   in
   let bindings_with_wrappers = List.flatten bindings_with_wrappers in
   List.map
-    (fun (fun_id, def) ->
-      cps_function env ~fid:fun_id ~recursive:(recursive fun_id)
+    (fun (fun_id, fun_uid, def) ->
+      cps_function env ~fid:fun_id ~fuid:fun_uid ~recursive:(recursive fun_id)
         ~precomputed_free_idents:(Ident.Map.find fun_id free_idents)
         def)
     bindings_with_wrappers
 
-and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
+and cps_function env ~fid ~fuid ~(recursive : Recursive.t)
+    ?precomputed_free_idents
     ({ kind; params; return; body; attr; loc; mode; region } : L.lfunction) :
     Function_decl.t =
   let first_complex_local_param =
@@ -1693,10 +1739,11 @@ and cps_function env ~fid ~(recursive : Recursive.t) ?precomputed_free_idents
   let return =
     Flambda_arity.create [Flambda_kind.With_subkind.from_lambda return]
   in
-  Function_decl.create ~let_rec_ident:(Some fid) ~function_slot ~kind ~params
-    ~return ~return_continuation:body_cont ~exn_continuation ~my_region ~body
-    ~attr ~loc ~free_idents_of_body recursive ~closure_alloc_mode:mode
-    ~first_complex_local_param ~contains_no_escaping_local_allocs:region
+  Function_decl.create ~let_rec_ident:(Some fid) ~let_rec_uid:fuid
+    ~function_slot ~kind ~params ~return ~return_continuation:body_cont
+    ~exn_continuation ~my_region ~body ~attr ~loc ~free_idents_of_body recursive
+    ~closure_alloc_mode:mode ~first_complex_local_param
+    ~contains_no_escaping_local_allocs:region
 
 and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
     ~scrutinee (k : Continuation.t) (k_exn : Continuation.t) : Expr_with_acc.t =
@@ -1802,7 +1849,9 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
             CC.close_switch acc ccenv ~condition_dbg scrutinee_tag block_switch
           in
           CC.close_let acc ccenv
-            [scrutinee_tag, Flambda_kind.With_subkind.naked_immediate]
+            [ ( scrutinee_tag,
+                Shape.Uid.internal_not_actually_unique,
+                Flambda_kind.With_subkind.naked_immediate ) ]
             Not_user_visible (Get_tag scrutinee) ~body
         in
         if switch.sw_numblocks = 0
@@ -1826,7 +1875,9 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
             in
             let region = Env.current_region env in
             CC.close_let acc ccenv
-              [is_scrutinee_int, Flambda_kind.With_subkind.naked_immediate]
+              [ ( is_scrutinee_int,
+                  Shape.Uid.internal_not_actually_unique,
+                  Flambda_kind.With_subkind.naked_immediate ) ]
               Not_user_visible
               (Prim
                  { prim = Pisint { variant_only = true };
