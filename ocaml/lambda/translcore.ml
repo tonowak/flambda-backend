@@ -1187,7 +1187,7 @@ and transl_apply ~scopes
   in
   build_apply lam [] loc position mode args
 
-and add_type_shapes_of_vars cases =
+and add_type_shapes_of_cases cases =
   let add_case (case : Typedtree.value Typedtree.case) =
     let var_list = Typedtree.pat_bound_idents_full Sort.value case.c_lhs in
     List.iter (fun (_ident, _loc, type_expr, var_uid, _mode) ->
@@ -1196,6 +1196,16 @@ and add_type_shapes_of_vars cases =
       var_list
   in
   List.iter add_case cases
+
+and add_type_shapes_of_patterns patterns =
+  let add_case (value_binding : Typedtree.value_binding) =
+    let var_list = Typedtree.pat_bound_idents_full Sort.value value_binding.vb_pat in
+    List.iter (fun (_ident, _loc, type_expr, var_uid, _mode) ->
+      Type_shape.add_to_type_shapes var_uid type_expr
+        (Typedecl.uid_of_path ~env:value_binding.vb_expr.exp_env))
+      var_list
+  in
+  List.iter add_case patterns
 
 and uids_of_vars cases =
   let tbl = ref (Ident.Tbl.create 42) in
@@ -1252,7 +1262,7 @@ and transl_curried_function
              Curried {nlocal = nlocal + 1}
         in
         let arg_mode = transl_alloc_mode arg_mode in
-        add_type_shapes_of_vars cases;
+        add_type_shapes_of_cases cases;
         let params = {
           name = param ;
           var_uid = Ident.Tbl.find_opt (uids_of_vars cases) param
@@ -1356,7 +1366,7 @@ and transl_function0
         | Alloc_heap -> 0
     in
     let arg_mode = transl_alloc_mode arg_mode in
-    add_type_shapes_of_vars cases;
+    add_type_shapes_of_cases cases;
     ((Curried {nlocal},
       [{ name = param;
          var_uid = Ident.Tbl.find_opt (uids_of_vars cases) param
@@ -1427,6 +1437,7 @@ and transl_bound_exp ~scopes ~in_structure pat sort expr =
 *)
 and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
                rec_flag pat_expr_list =
+  add_type_shapes_of_patterns pat_expr_list;
   match rec_flag with
     Nonrecursive ->
       let rec transl = function
