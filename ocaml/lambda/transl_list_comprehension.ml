@@ -173,7 +173,7 @@ let iterator ~transl_exp ~scopes = function
       let transl_bound var bound =
         Let_binding.make
           (Immutable Strict) (Pvalue Pintval)
-          var (transl_exp ~scopes Sort.for_predef_value bound)
+          var Uid.internal_not_actually_unique (transl_exp ~scopes Sort.for_predef_value bound)
       in
       let start = transl_bound "start" start in
       let stop  = transl_bound "stop"  stop  in
@@ -188,7 +188,7 @@ let iterator ~transl_exp ~scopes = function
   | Texp_comp_in { pattern; sequence } ->
       let iter_list =
         Let_binding.make (Immutable Strict) (Pvalue Pgenval)
-          "iter_list" (transl_exp ~scopes Sort.for_predef_value sequence)
+          "iter_list" Uid.internal_not_actually_unique (transl_exp ~scopes Sort.for_predef_value sequence)
       in
       (* Create a fresh variable to use as the function argument *)
       let element = Ident.create_local "element" in

@@ -73,8 +73,8 @@ let transl_object =
 let probe_handlers = ref []
 let clear_probe_handlers () = probe_handlers := []
 let declare_probe_handlers lam =
-  List.fold_left (fun acc (funcid, func) ->
-      Llet(Strict, Lambda.layout_function, funcid, func, acc))
+  List.fold_left (fun acc (funcid, funcuid, func) ->
+      Llet(Strict, Lambda.layout_function, funcid, funcuid, func, acc))
     lam
     !probe_handlers
 
@@ -733,7 +733,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let loc = of_location ~scopes e.exp_loc in
       let self = transl_value_path loc e.exp_env path_self in
       let cpy = Ident.create_local "copy" in
-      Llet(Strict, Lambda.layout_object, cpy,
+      Llet(Strict, Lambda.layout_object, cpy, Uid.internal_not_actually_unique,
            Lapply{
              ap_loc=Loc_unknown;
              ap_func=Translobj.oo_prim "copy";
@@ -761,13 +761,15 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         let mod_scopes = enter_module_definition ~scopes id in
         !transl_module ~scopes:mod_scopes Tcoerce_none None modl
       in
-      Llet(Strict, Lambda.layout_module, id, defining_expr,
+      Llet(Strict, Lambda.layout_module, id, Uid.internal_not_actually_unique, defining_expr,
            transl_exp ~scopes sort body)
   | Texp_letmodule(_, _, Mp_absent, _, body) ->
       transl_exp ~scopes sort body
   | Texp_letexception(cd, body) ->
+    (* CR tnowak: verify *)
+    let uid = Uid.internal_not_actually_unique in
       Llet(Strict, Lambda.layout_block,
-           cd.ext_id, transl_extension_constructor ~scopes e.exp_env None cd,
+           cd.ext_id, uid, transl_extension_constructor ~scopes e.exp_env None cd,
            transl_exp ~scopes sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
@@ -870,14 +872,18 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                module.  When that changes, some adjustments may be needed
                here. *)
             List.fold_left (fun (body, pos) id ->
-              Llet(Alias, Lambda.layout_module_field, id,
+              (* CR tnowak: verify *)
+              let uid = Uid.internal_not_actually_unique in
+              Llet(Alias, Lambda.layout_module_field, id, uid,
                    Lprim(mod_field pos, [Lvar oid],
                          of_location ~scopes od.open_loc), body),
               pos + 1
             ) (transl_exp ~scopes sort e, 0)
               (bound_value_identifiers od.open_bound_items)
           in
-          Llet(pure, Lambda.layout_module, oid,
+          (* CR tnowak: verify *)
+          let ouid = Uid.internal_not_actually_unique in
+          Llet(pure, Lambda.layout_module, oid, ouid,
                !transl_module ~scopes Tcoerce_none None od.open_expr, body)
       end
   | Texp_probe {name; handler=exp; enabled_at_init} ->
@@ -939,6 +945,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           tmc_candidate = false;
         } in
       let funcid = Ident.create_local ("probe_handler_" ^ name) in
+      let funcuid = Uid.internal_not_actually_unique in
       let return_layout = layout_unit (* Probe bodies have type unit. *) in
       let handler =
         let scopes = enter_value_definition ~scopes funcid in
@@ -974,14 +981,14 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       in
       begin match Config.flambda || Config.flambda2 with
       | true ->
-          Llet(Strict, Lambda.layout_function, funcid, handler, Lapply app)
+          Llet(Strict, Lambda.layout_function, funcid, funcuid, handler, Lapply app)
       | false ->
         (* Needs to be lifted to top level manually here,
            because functions that contain other function declarations
            are not inlined by Closure. For example, adding a probe into
            the body of function foo will prevent foo from being inlined
            into another function. *)
-        probe_handlers := (funcid, handler)::!probe_handlers;
+        probe_handlers := (funcid, funcuid, handler)::!probe_handlers;
         Lapply app
       end
     end else begin
@@ -1115,7 +1122,8 @@ and transl_apply ~scopes
             Lvar _ | Lconst _ -> (lam, layout)
           | _ ->
               let id = Ident.create_local name in
-              defs := (id, layout, lam) :: !defs;
+              let uid = Uid.internal_not_actually_unique in
+              defs := (id, uid, layout, lam) :: !defs;
               (Lvar id, layout)
         in
         let lam =
@@ -1163,7 +1171,7 @@ and transl_apply ~scopes
                     ~attr:default_stub_attribute ~loc
         in
         List.fold_right
-          (fun (id, layout, lam) body -> Llet(Strict, layout, id, lam, body))
+          (fun (id, uid, layout, lam) body -> Llet(Strict, layout, id, uid, lam, body))
           !defs body
     | Arg (arg, _) :: l -> build_apply lam (arg :: args) loc pos ap_mode l
     | [] -> lapply lam (List.rev args) loc pos ap_mode result_layout
@@ -1455,7 +1463,9 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         let lam =
           if add_regions then maybe_region_exp vb_sort expr lam else lam
         in
-        (id, lam) in
+        (* CR tnowak: verify *)
+        let uid = Uid.internal_not_actually_unique in
+        (id, uid, lam) in
       let lam_bds = List.map2 transl_case pat_expr_list idlist in
       fun body -> Lletrec(lam_bds, body)
 
@@ -1480,6 +1490,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     (* CR layouts v5: currently we raise if a non-value field is detected.
        relax that. *)
     let init_id = Ident.create_local "init" in
+    let init_uid = Uid.internal_not_actually_unique in
     let lv =
       Array.mapi
         (fun i (lbl, definition) ->
@@ -1556,13 +1567,14 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
     in
     begin match opt_init_expr with
       None -> lam
-    | Some init_expr -> Llet(Strict, Lambda.layout_block, init_id,
+    | Some init_expr -> Llet(Strict, Lambda.layout_block, init_id, init_uid,
                              transl_exp ~scopes Sort.for_record init_expr, lam)
     end
   end else begin
     (* Take a shallow copy of the init record, then mutate the fields
        of the copy *)
     let copy_id = Ident.create_local "newrecord" in
+    let copy_uid = Uid.internal_not_actually_unique in
     let update_field cont (lbl, definition) =
       (* CR layouts v5: remove this check to allow non-value fields.  Even
          in the current version we can reasonably skip it because if we built
@@ -1594,7 +1606,7 @@ and transl_record ~scopes loc env mode fields repres opt_init_expr =
       None -> assert false
     | Some init_expr ->
         assert (is_heap_mode (Option.get mode)); (* Pduprecord must be Alloc_heap and not unboxed *)
-        Llet(Strict, Lambda.layout_block, copy_id,
+        Llet(Strict, Lambda.layout_block, copy_id, copy_uid,
              Lprim(Pduprecord (repres, size),
                    [transl_exp ~scopes Sort.for_record init_expr],
                    of_location ~scopes loc),
@@ -1631,8 +1643,8 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
         let ids_full = Typedtree.pat_bound_idents_full arg_sort pv in
         let ids = List.map (fun (id, _, _, _, _) -> id) ids_full in
         let ids_kinds =
-          List.map (fun (id, {Location.loc; _}, ty, _uid, s) ->
-            id, Typeopt.layout pv.pat_env loc s ty)
+          List.map (fun (id, {Location.loc; _}, ty, uid, s) ->
+            id, uid, Typeopt.layout pv.pat_env loc s ty)
             ids_full
         in
         let vids = List.map Ident.rename ids in
@@ -1698,7 +1710,8 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
             (fun (arg,s) ->
                let layout = layout_exp s arg in
                let id = Typecore.name_pattern "val" [] in
-               (id, layout), (Lvar id, s, layout))
+               let uid = Uid.internal_not_actually_unique in
+               (id, uid, layout), (Lvar id, s, layout))
             argl
           |> List.split
         in
@@ -1713,8 +1726,9 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
         e.exp_loc None (transl_exp ~scopes arg_sort arg) val_cases partial
     | arg, _ :: _ ->
         let val_id = Typecore.name_pattern "val" (List.map fst val_cases) in
+        let val_uid = Uid.internal_not_actually_unique in
         let arg_layout = layout_exp arg_sort arg in
-        static_catch [transl_exp ~scopes arg_sort arg] [val_id, arg_layout]
+        static_catch [transl_exp ~scopes arg_sort arg] [val_id, val_uid, arg_layout]
           (Matching.for_function ~scopes ~arg_sort ~arg_layout ~return_layout
              e.exp_loc None (Lvar val_id) val_cases partial)
   in
@@ -1728,7 +1742,9 @@ and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
     | [] -> prev_lam
     | and_ :: rest ->
         let left_id = Ident.create_local "left" in
+        let left_uid = Uid.internal_not_actually_unique in
         let right_id = Ident.create_local "right" in
+        let right_uid = Uid.internal_not_actually_unique in
         let op =
           transl_ident (of_location ~scopes and_.bop_op_name.loc) env
             and_.bop_op_type and_.bop_op_path and_.bop_op_val Id_value
@@ -1740,7 +1756,7 @@ and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
             and_.bop_op_type
         in
         let lam =
-          bind_with_layout Strict (right_id, right_layout) exp
+          bind_with_layout Strict (right_id, right_uid, right_layout) exp
             (Lapply{
                ap_loc = of_location ~scopes and_.bop_loc;
                ap_func = op;
@@ -1754,7 +1770,7 @@ and transl_letop ~scopes loc env let_ ands param param_sort case case_sort
                ap_probe=None;
              })
         in
-        bind_with_layout Strict (left_id, prev_layout) prev_lam (loop result_layout lam rest)
+        bind_with_layout Strict (left_id, left_uid, prev_layout) prev_lam (loop result_layout lam rest)
   in
   let op =
     transl_ident (of_location ~scopes let_.bop_op_name.loc) env

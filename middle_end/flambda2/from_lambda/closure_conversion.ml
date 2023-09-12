@@ -285,13 +285,18 @@ module Inlining = struct
       List.fold_left2
         (fun (acc, body) param arg ->
           Let_with_acc.create acc
-            (Bound_pattern.singleton (VB.create param Name_mode.normal))
+            (* CR tnowak: verify *)
+            (Bound_pattern.singleton
+               (VB.create param Shape.Uid.internal_not_actually_unique
+                  Name_mode.normal))
             (Named.create_simple arg) ~body)
         (acc, body) params args
     in
     let bind_depth ~my_depth ~rec_info ~body:(acc, body) =
       Let_with_acc.create acc
-        (Bound_pattern.singleton (VB.create my_depth Name_mode.normal))
+        (Bound_pattern.singleton
+           (VB.create my_depth Shape.Uid.internal_not_actually_unique
+              Name_mode.normal))
         (Named.create_rec_info rec_info)
         ~body
     in
@@ -311,7 +316,9 @@ module Inlining = struct
     in
     Let_with_acc.create acc
       (Bound_pattern.singleton
-         (VB.create (Variable.create "inlined_dbg") Name_mode.normal))
+         (VB.create
+            (Variable.create "inlined_dbg")
+            Shape.Uid.internal_not_actually_unique Name_mode.normal))
       (Named.create_prim
          (Nullary (Enter_inlined_apply { dbg = apply_dbg }))
          Debuginfo.none)
@@ -416,7 +423,8 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
   in
   let env, let_bound_vars =
     List.fold_left_map
-      (fun env (id, kind) -> Env.add_var_like env id Not_user_visible kind)
+      (fun env (id, _uid, kind) ->
+        Env.add_var_like env id Not_user_visible kind)
       env let_bound_ids_with_kinds
   in
   let let_bound_var =
@@ -515,7 +523,10 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
           match args with
           | [arg] ->
             let result = Variable.create "reinterpreted_int64" in
-            let result' = Bound_var.create result Name_mode.normal in
+            let result' =
+              Bound_var.create result Shape.Uid.internal_not_actually_unique
+                Name_mode.normal
+            in
             let bindable = Bound_pattern.singleton result' in
             let prim = P.Unary (Reinterpret_int64_as_float, arg) in
             let acc, return_result =
@@ -567,7 +578,10 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
         | Some named ->
           fun args acc ->
             let unboxed_arg = Variable.create "unboxed" in
-            let unboxed_arg' = VB.create unboxed_arg Name_mode.normal in
+            let unboxed_arg' =
+              VB.create unboxed_arg Shape.Uid.internal_not_actually_unique
+                Name_mode.normal
+            in
             let acc, body = call (Simple.var unboxed_arg :: args) acc in
             let named = Named.create_prim (Unary (named, arg)) dbg in
             Let_with_acc.create acc
@@ -594,7 +608,10 @@ let close_c_call acc env ~loc ~let_bound_ids_with_kinds
       body )
   in
   let box_unboxed_returns ~let_bound_var ~box_return_value =
-    let let_bound_var' = VB.create let_bound_var Name_mode.normal in
+    let let_bound_var' =
+      VB.create let_bound_var Shape.Uid.internal_not_actually_unique
+        Name_mode.normal
+    in
     let handler_param = Variable.rename let_bound_var in
     let body acc =
       let acc, body = keep_body acc in
@@ -897,7 +914,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
   let rec cont ids_with_kinds env acc (defining_exprs : Named.t list) =
     match ids_with_kinds, defining_exprs with
     | [], [] -> body acc env
-    | (id, kind) :: ids_with_kinds, defining_expr :: defining_exprs -> (
+    | (id, uid, kind) :: ids_with_kinds, defining_expr :: defining_exprs -> (
       let body_env, var = Env.add_var_like env id user_visible kind in
       let body acc env = cont ids_with_kinds env acc defining_exprs in
       match defining_expr with
@@ -912,7 +929,7 @@ let close_let acc env let_bound_ids_with_kinds user_visible defining_expr
         body acc body_env
       | _ -> (
         let bound_pattern =
-          Bound_pattern.singleton (VB.create var Name_mode.normal)
+          Bound_pattern.singleton (VB.create var uid Name_mode.normal)
         in
         let bind acc env =
           (* CR pchambart: Not tail ! The body function is the recursion *)
@@ -1077,9 +1094,7 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
   let handler_env, env_params = Env.add_vars_like env params in
   let handler_params =
     List.map2
-      (fun param (_, _, kind) ->
-        BP.create param kind Shape.Uid.internal_not_actually_unique
-        (* CR tnowak: that's probably the place *))
+      (fun param (_, uid, _, kind) -> BP.create param kind uid)
       env_params params
     |> Bound_parameters.create
   in
@@ -1089,7 +1104,8 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
       | None -> handler_env
       | Some args ->
         List.fold_left2
-          (fun env arg_approx (param, (param_id, _, kind)) ->
+          (fun env arg_approx (param, (param_id, _param_uid, _, kind)) ->
+            (* CR tnowak: not sure, should we ignore the param_uid here? *)
             let env = Env.add_var_approximation env param arg_approx in
             match (arg_approx : Env.value_approximation) with
             | Value_symbol s | Closure_approximation { symbol = Some s; _ } ->
@@ -1225,7 +1241,10 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
     Expr_with_acc.t =
   let scrutinee = find_simple_from_id env scrutinee in
   let untagged_scrutinee = Variable.create "untagged" in
-  let untagged_scrutinee' = VB.create untagged_scrutinee Name_mode.normal in
+  let untagged_scrutinee' =
+    VB.create untagged_scrutinee Shape.Uid.internal_not_actually_unique
+      Name_mode.normal
+  in
   let known_const_scrutinee =
     match find_value_approximation_through_symbol acc env scrutinee with
     | Value_approximation.Value_int i -> Some i
@@ -1263,7 +1282,10 @@ let close_switch acc env ~condition_dbg scrutinee (sw : IR.switch) :
         condition_dbg
     in
     let comparison_result = Variable.create "eq" in
-    let comparison_result' = VB.create comparison_result Name_mode.normal in
+    let comparison_result' =
+      VB.create comparison_result Shape.Uid.internal_not_actually_unique
+        Name_mode.normal
+    in
     let acc, default_action =
       let acc, args = find_simples acc env default_args in
       let trap_action = close_trap_action_opt default_trap_action in
@@ -1531,7 +1553,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot decl
         let move : Flambda_primitive.unary_primitive =
           Project_function_slot { move_from = function_slot; move_to }
         in
-        let var = VB.create var Name_mode.normal in
+        (* CR tnowak: verify *)
+        let var =
+          VB.create var Shape.Uid.internal_not_actually_unique Name_mode.normal
+        in
         let named =
           Named.create_prim (Unary (move, my_closure')) Debuginfo.none
         in
@@ -1541,7 +1566,10 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot decl
   let acc, body =
     Variable.Map.fold
       (fun var value_slot (acc, body) ->
-        let var = VB.create var Name_mode.normal in
+        (* CR tnowak: verify *)
+        let var =
+          VB.create var Shape.Uid.internal_not_actually_unique Name_mode.normal
+        in
         let kind = Value_slot.kind value_slot in
         let named =
           Named.create_prim
@@ -1556,7 +1584,9 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot decl
   in
   let next_depth_expr = Rec_info_expr.succ (Rec_info_expr.var my_depth) in
   let bound =
-    Bound_pattern.singleton (Bound_var.create next_depth Name_mode.normal)
+    Bound_pattern.singleton
+      (Bound_var.create next_depth Shape.Uid.internal_not_actually_unique
+         Name_mode.normal)
   in
   let acc, body =
     Let_with_acc.create acc bound (Named.create_rec_info next_depth_expr) ~body
@@ -1948,7 +1978,10 @@ let close_let_rec acc env ~function_declarations
       (fun (fun_vars_map, ident_map) decl ->
         let ident = Function_decl.let_rec_ident decl in
         let fun_var =
-          VB.create (fst (Env.find_var env ident)) Name_mode.normal
+          (* CR tnowak: verify *)
+          VB.create
+            (fst (Env.find_var env ident))
+            Shape.Uid.internal_not_actually_unique Name_mode.normal
         in
         let function_slot = Function_decl.function_slot decl in
         ( Function_slot.Map.add function_slot fun_var fun_vars_map,
@@ -2011,7 +2044,9 @@ let close_let_rec acc env ~function_declarations
       Function_slot.Set.fold
         (fun function_slot fun_vars_map ->
           let fun_var =
-            VB.create (Variable.create "generated") Name_mode.normal
+            VB.create
+              (Variable.create "generated")
+              Shape.Uid.internal_not_actually_unique Name_mode.normal
           in
           Function_slot.Map.add function_slot fun_var fun_vars_map)
         generated_closures fun_vars_map
@@ -2118,7 +2153,8 @@ let wrap_partial_application acc env apply_continuation (apply : IR.apply)
       Ident.print apply.IR.func
       (Debuginfo.Scoped_location.string_of_scoped_location apply.IR.loc);
   let function_declarations =
-    [ Function_decl.create ~let_rec_ident:(Some wrapper_id) ~function_slot
+    [ Function_decl.create ~let_rec_ident:(Some wrapper_id)
+        ~let_rec_uid:Shape.Uid.internal_not_actually_unique ~function_slot
         ~kind:
           (Lambda.Curried
              { nlocal =
@@ -2218,7 +2254,8 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
         in
         Let_with_acc.create acc
           (Bound_pattern.singleton
-             (Bound_var.create (Variable.create "unit") Name_mode.normal))
+             (Bound_var.create (Variable.create "unit")
+                Shape.Uid.internal_not_actually_unique Name_mode.normal))
           (Named.create_prim (Unary (End_region, Simple.var region)) apply_dbg)
           ~body:call_return_continuation
       in
@@ -2242,7 +2279,9 @@ let wrap_over_application acc env full_call (apply : IR.apply) ~remaining
   | None -> acc, both_applications
   | Some (region, _) ->
     Let_with_acc.create acc
-      (Bound_pattern.singleton (Bound_var.create region Name_mode.normal))
+      (Bound_pattern.singleton
+         (Bound_var.create region Shape.Uid.internal_not_actually_unique
+            Name_mode.normal))
       (Named.create_prim (Nullary Begin_region) apply_dbg)
       ~body:both_applications
 
@@ -2531,7 +2570,10 @@ let wrap_final_module_block acc env ~program ~prog_return_cont
     in
     List.fold_left
       (fun (acc, body) (pos, var) ->
-        let var = VB.create var Name_mode.normal in
+        (* CR tnowak: verify *)
+        let var =
+          VB.create var Shape.Uid.internal_not_actually_unique Name_mode.normal
+        in
         let pat = Bound_pattern.singleton var in
         let pos = Targetint_31_63.of_int pos in
         let block = module_block_simple in

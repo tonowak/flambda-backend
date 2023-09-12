@@ -575,7 +575,11 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     let bound_vars, env =
       let convert_binding env (var, _) : Bound_var.t * env =
         let var, env = fresh_var env var in
-        let var = Bound_var.create var Name_mode.normal in
+        (* CR tnowak: verify *)
+        let var =
+          Bound_var.create var Shape.Uid.internal_not_actually_unique
+            Name_mode.normal
+        in
         var, env
       in
       map_accum_left convert_binding env vars_and_closure_bindings
@@ -602,7 +606,10 @@ let rec expr env (e : Fexpr.expr) : Flambda.Expr.t =
     let named = defining_expr env d in
     let id, env = fresh_var env var in
     let body = expr env body in
-    let var = Bound_var.create id Name_mode.normal in
+    let var =
+      Bound_var.create id Shape.Uid.internal_not_actually_unique
+        Name_mode.normal
+    in
     let bound = Bound_pattern.singleton var in
     Flambda.Let.create bound named ~body ~free_names_of_body:Unknown
     |> Flambda.Expr.create_let

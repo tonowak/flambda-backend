@@ -331,7 +331,9 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
                   Debuginfo.none
               in
               let bound =
-                VB.create not_scrutinee NM.normal |> Bound_pattern.singleton
+                VB.create not_scrutinee Shape.Uid.internal_not_actually_unique
+                  NM.normal
+                |> Bound_pattern.singleton
               in
               let apply_cont =
                 Apply_cont.create dest ~args:[not_scrutinee'] ~dbg
@@ -432,7 +434,9 @@ let simplify_switch ~simplify_let ~simplify_function_body dacc switch
   let let_expr =
     (* [body] won't be looked at (see below). *)
     Let.create
-      (Bound_pattern.singleton (Bound_var.create tagged_scrutinee NM.normal))
+      (Bound_pattern.singleton
+         (Bound_var.create tagged_scrutinee
+            Shape.Uid.internal_not_actually_unique NM.normal))
       tagging_prim
       ~body:(Expr.create_switch switch)
       ~free_names_of_body:Unknown

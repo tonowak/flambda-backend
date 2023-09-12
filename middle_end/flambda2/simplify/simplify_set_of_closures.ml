@@ -44,7 +44,8 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_region
       (* This happens in the stub case, where we are only simplifying code, not
          a set of closures. *)
       DE.add_variable denv
-        (Bound_var.create my_closure NM.normal)
+        (Bound_var.create my_closure Shape.Uid.internal_not_actually_unique
+           NM.normal)
         (T.unknown K.value)
     | Some function_slot -> (
       match
@@ -60,15 +61,22 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_region
       | name ->
         let name = Bound_name.name name in
         DE.add_variable denv
-          (Bound_var.create my_closure NM.normal)
+          (Bound_var.create my_closure Shape.Uid.internal_not_actually_unique
+             NM.normal)
           (T.alias_type_of K.value (Simple.name name)))
   in
   let denv =
-    let my_region = Bound_var.create my_region Name_mode.normal in
+    let my_region =
+      Bound_var.create my_region Shape.Uid.internal_not_actually_unique
+        Name_mode.normal
+    in
     DE.add_variable denv my_region (T.unknown K.region)
   in
   let denv =
-    let my_depth = Bound_var.create my_depth Name_mode.normal in
+    let my_depth =
+      Bound_var.create my_depth Shape.Uid.internal_not_actually_unique
+        Name_mode.normal
+    in
     DE.add_variable denv my_depth (T.unknown K.rec_info)
   in
   let denv =

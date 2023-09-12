@@ -17,7 +17,6 @@ module C = Cmm_helpers
 module R = To_cmm_result
 module P = Flambda_primitive
 module Ece = Effects_and_coeffects
-module Uid = Shape.Uid
 
 type free_vars = Backend_var.Set.t
 
@@ -283,7 +282,7 @@ let exported_offsets t = t.offsets
 
 (* Variables *)
 
-let gen_variable ?(uid = Uid.internal_not_actually_unique) v =
+let gen_variable ~uid v =
   let user_visible = Variable.user_visible v in
   let name = Variable.name v in
   let v = Backend_var.create_local name in
@@ -417,7 +416,7 @@ let is_cmm_simple cmm =
 
 (* Helper function to create bindings *)
 
-let create_binding_aux (type a) effs var ~(inline : a inline)
+let create_binding_aux (type a) effs (var : Bound_var.t) ~(inline : a inline)
     (bound_expr : a bound_expr) =
   let order =
     let incr =
@@ -428,7 +427,7 @@ let create_binding_aux (type a) effs var ~(inline : a inline)
     next_order := !next_order + incr;
     !next_order
   in
-  let cmm_var = gen_variable var in
+  let cmm_var = gen_variable ~uid:(Bound_var.uid var) (Bound_var.var var) in
   let binding = Binding { order; inline; effs; cmm_var; bound_expr } in
   binding
 
@@ -665,13 +664,13 @@ let bind_variable_with_decision (type a) ?extra env res var ~inline
     ~(defining_expr : a bound_expr) ~effects_and_coeffects_of_defining_expr:effs
     =
   let binding = create_binding ~inline effs var defining_expr in
-  add_binding_to_env ?extra env res var binding
+  add_binding_to_env ?extra env res (Bound_var.var var) binding
 
 let bind_variable ?extra env res var ~defining_expr ~free_vars_of_defining_expr
     ~num_normal_occurrences_of_bound_vars
     ~effects_and_coeffects_of_defining_expr =
   let inline =
-    To_cmm_effects.classify_let_binding var
+    To_cmm_effects.classify_let_binding (Bound_var.var var)
       ~effects_and_coeffects_of_defining_expr
       ~num_normal_occurrences_of_bound_vars
   in
@@ -856,6 +855,7 @@ let split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of
 let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
   let alias_of = resolve_alias env alias_of in
   let num_occurrences_of_var : Num_occurrences.t =
+    let var = Bound_var.var var in
     match Variable.Map.find var num_normal_occurrences_of_bound_vars with
     | exception Not_found ->
       Misc.fatal_errorf
@@ -869,7 +869,7 @@ let add_alias env res ~var ~alias_of ~num_normal_occurrences_of_bound_vars =
     | Zero ->
       let env = remove_binding env alias_of in
       env, res
-    | One -> make_alias env res var alias_of
+    | One -> make_alias env res (Bound_var.var var) alias_of
     | More_than_one ->
       let env = remove_binding env alias_of in
       split_binding_and_rebind ~num_occurrences_of_var env res ~var ~alias_of b)

@@ -49,14 +49,19 @@ let make_inlined_body ~callee ~unroll_to ~params ~args ~my_closure ~my_region
         Simple.List.print args;
     ListLabels.fold_left2 (List.rev params) (List.rev args) ~init:body
       ~f:(fun expr param arg ->
-        let var = Bound_var.create (BP.var param) Name_mode.normal in
+        let param_var, param_uid = BP.var_and_uid param in
+        let var = Bound_var.create param_var param_uid Name_mode.normal in
         Let.create
           (Bound_pattern.singleton var)
           (Named.create_simple arg) ~body:expr ~free_names_of_body:Unknown
         |> Expr.create_let)
   in
   let bind_depth ~my_depth ~rec_info ~body =
-    let bound = Bound_pattern.singleton (VB.create my_depth Name_mode.normal) in
+    let bound =
+      Bound_pattern.singleton
+        (VB.create my_depth Shape.Uid.internal_not_actually_unique
+           Name_mode.normal)
+    in
     Let.create bound
       (Named.create_rec_info rec_info)
       ~body ~free_names_of_body:Unknown

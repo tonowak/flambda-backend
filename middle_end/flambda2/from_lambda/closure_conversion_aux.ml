@@ -226,7 +226,7 @@ module Env = struct
   let add_vars_like t ids =
     let vars =
       List.map
-        (fun (id, (user_visible : IR.user_visible), kind) ->
+        (fun (id, _uid, (user_visible : IR.user_visible), kind) ->
           let user_visible =
             match user_visible with
             | Not_user_visible -> None
@@ -235,7 +235,7 @@ module Env = struct
           Variable.create_with_same_name_as_ident ?user_visible id, kind)
         ids
     in
-    add_vars t (List.map (fun (id, _, _) -> id) ids) vars, List.map fst vars
+    add_vars t (List.map (fun (id, _, _, _) -> id) ids) vars, List.map fst vars
 
   let find_var t id =
     try Ident.Map.find id t.variables
@@ -684,6 +684,7 @@ module Function_decls = struct
 
     type t =
       { let_rec_ident : Ident.t;
+        let_rec_uid : Uid.t;
         function_slot : Function_slot.t;
         kind : Lambda.function_kind;
         params : param list;
@@ -701,7 +702,7 @@ module Function_decls = struct
         contains_no_escaping_local_allocs : bool
       }
 
-    let create ~let_rec_ident ~function_slot ~kind ~params ~return
+    let create ~let_rec_ident ~let_rec_uid ~function_slot ~kind ~params ~return
         ~return_continuation ~exn_continuation ~my_region ~body
         ~(attr : Lambda.function_attribute) ~loc ~free_idents_of_body recursive
         ~closure_alloc_mode ~first_complex_local_param
@@ -712,6 +713,7 @@ module Function_decls = struct
         | Some let_rec_ident -> let_rec_ident
       in
       { let_rec_ident;
+        let_rec_uid;
         function_slot;
         kind;
         params;
