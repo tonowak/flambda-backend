@@ -17,7 +17,6 @@ module C = Cmm_helpers
 module R = To_cmm_result
 module P = Flambda_primitive
 module Ece = Effects_and_coeffects
-module Uid = Shape.Uid
 
 type free_vars = Backend_var.Set.t
 

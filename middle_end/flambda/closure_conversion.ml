@@ -197,14 +197,15 @@ let rec close t env (lam : Lambda.lambda) : Flambda.t =
   | Lconst cst ->
     let cst, name = close_const t cst in
     name_expr cst ~name
-  | Llet ((Strict | Alias | StrictOpt), layout, id, uid, defining_expr, body) ->
+  | Llet ((Strict | Alias | StrictOpt), layout, id, _uid, defining_expr, body) ->
+    (* CR tnowak: is it OK to ignore the uids in this file? *)
     let var = Variable.create_with_same_name_as_ident id in
     let defining_expr =
       close_let_bound_expression t var env defining_expr
     in
     let body = close t (Env.add_var env id var layout) body in
     Flambda.create_let var defining_expr body
-  | Lmutlet (block_kind, id, uid, defining_expr, body) ->
+  | Lmutlet (block_kind, id, _uid, defining_expr, body) ->
     let mut_var = Mutable_variable.create_with_same_name_as_ident id in
     let var = Variable.create_with_same_name_as_ident id in
     let defining_expr =
@@ -274,7 +275,7 @@ let rec close t env (lam : Lambda.lambda) : Flambda.t =
       (* Identify any bindings in the [let rec] that are functions.  These
          will be named after the corresponding identifier in the [let rec]. *)
       List.map (function
-          | (let_rec_ident, let_rec_uid,
+          | (let_rec_ident, _let_rec_uid,
              Lambda.Lfunction { kind; params; return; body; attr; loc; mode; region }) ->
             let closure_bound_var =
               let debug_info = Debuginfo.from_location loc in
@@ -327,7 +328,7 @@ let rec close t env (lam : Lambda.lambda) : Flambda.t =
          expression; any functions bound by it will have their own
          individual closures. *)
       let defs =
-        List.map (fun (id, uid, def) ->
+        List.map (fun (id, _uid, def) ->
             let var, _kind = Env.find_var env id in
             var, close_let_bound_expression t ~let_rec_ident:id var env def)
           defs
@@ -534,7 +535,7 @@ let rec close t env (lam : Lambda.lambda) : Flambda.t =
     let st_exn = Static_exception.create () in
     let env = Env.add_static_exception env i st_exn in
     let vars =
-      List.map (fun (ident, uid, kind) ->
+      List.map (fun (ident, _uid, kind) ->
           (Variable.create_with_same_name_as_ident ident, kind)) ids
     in
     let fst3 (a, _, _) = a in

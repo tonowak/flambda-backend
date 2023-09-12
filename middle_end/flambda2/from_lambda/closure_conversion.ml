@@ -1104,7 +1104,8 @@ let close_let_cont acc env ~name ~is_exn_handler ~params
       | None -> handler_env
       | Some args ->
         List.fold_left2
-          (fun env arg_approx (param, (param_id, param_uid, _, kind)) ->
+          (fun env arg_approx (param, (param_id, _param_uid, _, kind)) ->
+            (* CR tnowak: not sure, should we ignore the param_uid here? *)
             let env = Env.add_var_approximation env param arg_approx in
             match (arg_approx : Env.value_approximation) with
             | Value_symbol s | Closure_approximation { symbol = Some s; _ } ->
