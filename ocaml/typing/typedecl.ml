@@ -1595,7 +1595,7 @@ let transl_type_decl env rec_flag sdecl_list =
   let final_env = add_types_to_env decls env in
   (* Save the declarations in [Type_shape] for debug info. *)
   List.iter (fun (id, decl) ->
-    Type_shape.add_to_type_decls (Pident id) decl (uid_of_path ~env)
+    Type_shape.add_to_type_decls (Pident id) decl (uid_of_path ~env:final_env)
   ) decls;
   (* Check re-exportation *)
   let decls = List.map2 (check_abbrev final_env) sdecl_list decls in
