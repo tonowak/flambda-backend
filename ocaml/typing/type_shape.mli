@@ -73,6 +73,4 @@ val type_name :
   string
 
 val attach_compilation_unit_to_paths :
-  Type_decl_shape.t ->
-  compilation_unit:Compilation_unit.t ->
-  Type_decl_shape.t
+  Type_decl_shape.t -> compilation_unit:Compilation_unit.t -> Type_decl_shape.t

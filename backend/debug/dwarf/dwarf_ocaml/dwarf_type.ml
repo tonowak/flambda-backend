@@ -331,9 +331,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
   | None ->
     let reference = Proto_die.create_reference () in
     Type_shape.Type_shape.Tbl.add cache type_shape reference;
-    let name =
-      Type_shape.type_name type_shape ~load_decls_from_cms
-    in
+    let name = Type_shape.type_name type_shape ~load_decls_from_cms in
     let successfully_created =
       match type_shape with
       | Ts_other | Ts_var _ -> false
@@ -377,8 +375,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
           | Tds_record fields ->
             let fields =
               map_snd
-                (type_shape_to_die ~parent_proto_die ~fallback_die ~cache
-                   )
+                (type_shape_to_die ~parent_proto_die ~fallback_die ~cache)
                 fields
             in
             create_record_die ~reference ~parent_proto_die ~name ~fields;
@@ -393,8 +390,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
               let complex_constructors =
                 map_snd
                   (map_snd
-                     (type_shape_to_die ~parent_proto_die ~fallback_die ~cache
-                        ))
+                     (type_shape_to_die ~parent_proto_die ~fallback_die ~cache))
                   complex_constructors
               in
               create_complex_variant_die ~reference ~parent_proto_die ~name
@@ -403,8 +399,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
       | Ts_tuple fields ->
         let fields =
           List.map
-            (type_shape_to_die ~parent_proto_die ~fallback_die ~cache
-               )
+            (type_shape_to_die ~parent_proto_die ~fallback_die ~cache)
             fields
         in
         create_tuple_die ~reference ~parent_proto_die ~name ~fields;

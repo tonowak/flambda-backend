@@ -210,9 +210,7 @@ module Type_decl_shape = struct
                    Ident.name lbl.ld_id, Type_shape.Ts_predef (Unboxed_float, []))
                  lbl_list)
           | Record_inlined _ | Record_unboxed -> Tds_other)
-        | Type_abstract ->
-          Format.eprintf "got Type_abstract path=%a\n" Path.print path;
-          Tds_other
+        | Type_abstract -> Tds_other
         | Type_open -> Tds_other)
     in
     let type_params =
@@ -293,7 +291,6 @@ module Type_decl_shape = struct
             | Tds_other -> Tds_other)
         }
       in
-      Format.eprintf "substitued to %a\n" print ret;
       ret
     | false ->
       (* CR tnowak: investigate *)
@@ -339,7 +336,7 @@ let rec split_type_path_at_compilation_unit (path : Path.t) =
     let comp_unit, path = split_type_path_at_compilation_unit path in
     comp_unit, Path.Pdot (path, s)
 
-let debug = true
+let debug = false
 
 let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
     ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
@@ -369,30 +366,22 @@ let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
       Some all_type_decls
   in
   Option.bind compilation_unit_type_decls (fun tbl ->
-        Uid.Tbl.find_opt tbl type_uid)
+      Uid.Tbl.find_opt tbl type_uid)
 
 let rec type_name (type_shape : Type_shape.t)
     ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
   match type_shape with
   | Ts_predef (predef, shapes) ->
-    shapes_to_string
-      (List.map
-         (type_name ~load_decls_from_cms)
-         shapes)
+    shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
     ^ Type_shape.Predef.to_string predef
   | Ts_other ->
     if debug then Format.eprintf "unknown0\n";
     "unknown"
   | Ts_tuple shapes ->
-    tuple_to_string
-      (List.map
-         (type_name ~load_decls_from_cms)
-         shapes)
+    tuple_to_string (List.map (type_name ~load_decls_from_cms) shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
   | Ts_constr ((type_uid, type_path), shapes) -> (
-    match
-      find_in_type_decls type_uid type_path ~load_decls_from_cms
-    with
+    match find_in_type_decls type_uid type_path ~load_decls_from_cms with
     | None ->
       if debug then Format.eprintf "unknown2\n";
       "unknown"
@@ -404,25 +393,23 @@ let rec type_name (type_shape : Type_shape.t)
         Type_decl_shape.replace_tvar type_decl_shape shapes
       in
       let args =
-        shapes_to_string
-          (List.map
-             (type_name ~load_decls_from_cms)
-             shapes)
+        shapes_to_string (List.map (type_name ~load_decls_from_cms) shapes)
       in
       let name = Path.name type_decl_shape.path in
       args ^ name)
 
 let rec attach_head (path : Path.t) (new_head : Ident.t) =
   match path with
-  | Pident ident ->
-    Path.Pdot (Pident new_head, Ident.name ident)
+  | Pident ident -> Path.Pdot (Pident new_head, Ident.name ident)
   | Pdot (l, r) -> Path.Pdot (attach_head l new_head, r)
   | Papply (l, r) -> Path.Papply (attach_head l new_head, attach_head r new_head)
 
-let attach_compilation_unit_to_path (path : Path.t) (compilation_unit : Compilation_unit.t)
-    =
+let attach_compilation_unit_to_path (path : Path.t)
+    (compilation_unit : Compilation_unit.t) =
   match split_type_path_at_compilation_unit path with
-  | None, _ -> attach_head path (Compilation_unit.to_global_ident_for_bytecode compilation_unit)
+  | None, _ ->
+    attach_head path
+      (Compilation_unit.to_global_ident_for_bytecode compilation_unit)
   | Some _, _ -> path
 
 let map_snd f list = List.map (fun (a, b) -> a, f b) list
