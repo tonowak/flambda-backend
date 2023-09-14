@@ -41,7 +41,6 @@ module Type_decl_shape : sig
 
   type t =
     { path : Path.t;
-      compilation_unit : Compilation_unit.t option;
       definition : tds;
       type_params : Type_shape.t list
     }
@@ -66,11 +65,14 @@ val find_in_type_decls :
   Uid.t ->
   Path.t ->
   load_decls_from_cms:(string -> Type_decl_shape.t Uid.Tbl.t) ->
-  current_compilation_unit:string option ->
-  Type_decl_shape.t option * string option
+  Type_decl_shape.t option
 
 val type_name :
   Type_shape.t ->
   load_decls_from_cms:(string -> Type_decl_shape.t Uid.Tbl.t) ->
-  current_compilation_unit:string option ->
   string
+
+val attach_compilation_unit_to_paths :
+  Type_decl_shape.t ->
+  compilation_unit:Compilation_unit.t ->
+  Type_decl_shape.t

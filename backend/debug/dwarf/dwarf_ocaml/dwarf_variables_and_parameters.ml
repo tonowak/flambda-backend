@@ -242,12 +242,11 @@ let dwarf_for_variable state ~function_proto_die ~proto_dies_for_vars
       Some index
   in
   if not hidden
-  then (
+  then
     Proto_die.create_ignore ?reference ?sort_priority
       ?location_list_in_debug_loc_table ~parent:(Some parent_proto_die) ~tag
       ~attribute_values:(type_and_name_attributes @ location_attribute_value)
       ()
-  )
 
 let iterate_over_variable_like_things state ~available_ranges_vars ~f =
   ARV.iter available_ranges_vars ~f:(fun var range ->
@@ -258,7 +257,6 @@ let dwarf state ~function_proto_die available_ranges_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
   iterate_over_variable_like_things state ~available_ranges_vars
     ~f:(fun var ~ident_for_type:_ ~range:_ ->
-      Format.eprintf "dwarf var = %a\n" V.print var;
       let value_die_lvalue = Proto_die.create_reference () in
       let type_die = Proto_die.create_reference () in
       assert (not (Backend_var.Tbl.mem proto_dies_for_vars var));

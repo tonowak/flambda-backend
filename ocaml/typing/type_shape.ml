@@ -146,7 +146,6 @@ module Type_decl_shape = struct
 
   type t =
     { path : Path.t;
-      compilation_unit : Compilation_unit.t option;
       definition : tds;
       type_params : Type_shape.t list
     }
@@ -174,8 +173,8 @@ module Type_decl_shape = struct
     in
     length == 0
 
-  let of_type_declaration compilation_unit path
-      (type_declaration : Types.type_declaration) uid_of_path =
+  let of_type_declaration path (type_declaration : Types.type_declaration)
+      uid_of_path =
     let definition =
       match type_declaration.type_manifest with
       | Some type_expr ->
@@ -211,7 +210,9 @@ module Type_decl_shape = struct
                    Ident.name lbl.ld_id, Type_shape.Ts_predef (Unboxed_float, []))
                  lbl_list)
           | Record_inlined _ | Record_unboxed -> Tds_other)
-        | Type_abstract -> Format.eprintf "got Type_abstract path=%a\n" Path.print path; Tds_other
+        | Type_abstract ->
+          Format.eprintf "got Type_abstract path=%a\n" Path.print path;
+          Tds_other
         | Type_open -> Tds_other)
     in
     let type_params =
@@ -219,7 +220,7 @@ module Type_decl_shape = struct
         (fun type_expr -> Type_shape.of_type_expr type_expr uid_of_path)
         type_declaration.type_params
     in
-    { path; definition; type_params; compilation_unit }
+    { path; definition; type_params }
 
   let print_one_constructor ppf (name, type_shape) =
     match name with
@@ -256,13 +257,13 @@ module Type_decl_shape = struct
     | Tds_other -> Format.fprintf ppf "Tds_other"
 
   let print ppf t =
-    Format.fprintf ppf "path=%a, comp_unit=%a, definition=(%a)" Path.print t.path (Format.pp_print_option Compilation_unit.print) t.compilation_unit print_tds
+    Format.fprintf ppf "path=%a, definition=(%a)" Path.print t.path print_tds
       t.definition
 
   let map_snd f list = List.map (fun (fst, snd) -> fst, f snd) list
 
   let replace_tvar (t : t) (shapes : Type_shape.t list) =
-    let debug = true in
+    let debug = false in
     if debug
     then
       Format.eprintf "replacing tvar %a; %a; %a\n%!" print t
@@ -275,29 +276,28 @@ module Type_decl_shape = struct
       let replace_tvar =
         Type_shape.replace_tvar ~pairs:(List.combine t.type_params shapes)
       in
-      { type_params = [];
-        path = t.path;
-        compilation_unit = t.compilation_unit;
-        definition =
-          (match t.definition with
-          | Tds_variant { simple_constructors; complex_constructors } ->
-            Tds_variant
-              { simple_constructors;
-                complex_constructors =
-                  map_snd (map_snd replace_tvar) complex_constructors
-              }
-          | Tds_record field_list ->
-            Tds_record (map_snd replace_tvar field_list)
-          | Tds_alias type_shape -> Tds_alias (replace_tvar type_shape)
-          | Tds_other -> Tds_other)
-      }
+      let ret =
+        { type_params = [];
+          path = t.path;
+          definition =
+            (match t.definition with
+            | Tds_variant { simple_constructors; complex_constructors } ->
+              Tds_variant
+                { simple_constructors;
+                  complex_constructors =
+                    map_snd (map_snd replace_tvar) complex_constructors
+                }
+            | Tds_record field_list ->
+              Tds_record (map_snd replace_tvar field_list)
+            | Tds_alias type_shape -> Tds_alias (replace_tvar type_shape)
+            | Tds_other -> Tds_other)
+        }
+      in
+      Format.eprintf "substitued to %a\n" print ret;
+      ret
     | false ->
       (* CR tnowak: investigate *)
-      { type_params = [];
-        path = t.path;
-        compilation_unit = t.compilation_unit;
-        definition = Tds_other
-      }
+      { type_params = []; path = t.path; definition = Tds_other }
 end
 
 let (all_type_decls : Type_decl_shape.t Uid.Tbl.t) = Uid.Tbl.create 42
@@ -307,9 +307,7 @@ let (all_type_shapes : Type_shape.t Uid.Tbl.t) = Uid.Tbl.create 42
 let add_to_type_decls path (type_decl : Types.type_declaration) uid_of_path =
   let uid = type_decl.type_uid in
   let type_decl_shape =
-    Type_decl_shape.of_type_declaration
-      (Compilation_unit.get_current ())
-      path type_decl uid_of_path
+    Type_decl_shape.of_type_declaration path type_decl uid_of_path
   in
   Uid.Tbl.add all_type_decls uid type_decl_shape
 
@@ -341,29 +339,23 @@ let rec split_type_path_at_compilation_unit (path : Path.t) =
     let comp_unit, path = split_type_path_at_compilation_unit path in
     comp_unit, Path.Pdot (path, s)
 
-let debug = false
+let debug = true
 
 let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
-    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t)
-    ~(current_compilation_unit : string option) =
+    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
   if debug
   then Format.eprintf "trying to find type_uid = %a\n" Uid.print type_uid;
   if debug then Format.eprintf "splitting %a\n" Path.print type_path;
-  let current_compilation_unit =
-    match split_type_path_at_compilation_unit type_path with
-    | Some compilation_unit, _ -> Some compilation_unit
-    | None, _ -> current_compilation_unit
-  in
   let compilation_unit_type_decls =
-    match current_compilation_unit with
-    | Some compilation_unit -> (
+    match split_type_path_at_compilation_unit type_path with
+    | Some compilation_unit, _ -> (
       if debug
       then
         Format.eprintf "got compilation unit %a\n" Format.pp_print_string
           compilation_unit;
       (* CR tnowak: change the [String.lowercase_ascii] to a proper function. *)
       let filename = compilation_unit |> String.uncapitalize_ascii in
-      match Load_path.find_uncap (filename ^ ".cms") with
+      match Load_path.find_uncap (filename ^ ".cmt") with
       | exception Not_found ->
         if debug
         then
@@ -372,22 +364,20 @@ let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
       | fn ->
         let type_decls = load_decls_from_cms fn in
         Some type_decls)
-    | None ->
+    | None, _ ->
       if debug then Format.eprintf "same unit\n";
       Some all_type_decls
   in
-  ( Option.bind compilation_unit_type_decls (fun tbl ->
-        Uid.Tbl.find_opt tbl type_uid),
-    current_compilation_unit )
+  Option.bind compilation_unit_type_decls (fun tbl ->
+        Uid.Tbl.find_opt tbl type_uid)
 
 let rec type_name (type_shape : Type_shape.t)
-    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t)
-    ~(current_compilation_unit : string option) =
+    ~(load_decls_from_cms : string -> Type_decl_shape.t Shape.Uid.Tbl.t) =
   match type_shape with
   | Ts_predef (predef, shapes) ->
     shapes_to_string
       (List.map
-         (type_name ~load_decls_from_cms ~current_compilation_unit)
+         (type_name ~load_decls_from_cms)
          shapes)
     ^ Type_shape.Predef.to_string predef
   | Ts_other ->
@@ -396,31 +386,67 @@ let rec type_name (type_shape : Type_shape.t)
   | Ts_tuple shapes ->
     tuple_to_string
       (List.map
-         (type_name ~load_decls_from_cms ~current_compilation_unit)
+         (type_name ~load_decls_from_cms)
          shapes)
   | Ts_var name -> "'" ^ Option.value name ~default:"?"
   | Ts_constr ((type_uid, type_path), shapes) -> (
     match
       find_in_type_decls type_uid type_path ~load_decls_from_cms
-        ~current_compilation_unit
     with
-    | None, _ ->
+    | None ->
       if debug then Format.eprintf "unknown2\n";
       "unknown"
-    | Some { definition = Tds_other; _ }, _ ->
+    | Some { definition = Tds_other; _ } ->
       if debug then Format.eprintf "unknown1\n";
       "unknown"
-    | Some type_decl_shape, current_compilation_unit ->
+    | Some type_decl_shape ->
+      let type_decl_shape =
+        Type_decl_shape.replace_tvar type_decl_shape shapes
+      in
       let args =
         shapes_to_string
           (List.map
-             (type_name ~load_decls_from_cms ~current_compilation_unit)
+             (type_name ~load_decls_from_cms)
              shapes)
       in
-      let name_with_compilation_unit =
-        (match type_decl_shape.compilation_unit with
-        | None -> ""
-        | Some c -> Compilation_unit.full_path_as_string c ^ ".")
-        ^ Path.name type_decl_shape.path
-      in
-      args ^ name_with_compilation_unit)
+      let name = Path.name type_decl_shape.path in
+      args ^ name)
+
+let rec attach_head (path : Path.t) (new_head : Ident.t) =
+  match path with
+  | Pident ident ->
+    Path.Pdot (Pident new_head, Ident.name ident)
+  | Pdot (l, r) -> Path.Pdot (attach_head l new_head, r)
+  | Papply (l, r) -> Path.Papply (attach_head l new_head, attach_head r new_head)
+
+let attach_compilation_unit_to_path (path : Path.t) (compilation_unit : Compilation_unit.t)
+    =
+  match split_type_path_at_compilation_unit path with
+  | None, _ -> attach_head path (Compilation_unit.to_global_ident_for_bytecode compilation_unit)
+  | Some _, _ -> path
+
+let map_snd f list = List.map (fun (a, b) -> a, f b) list
+
+let attach_compilation_unit_to_paths (type_decl : Type_decl_shape.t)
+    ~(compilation_unit : Compilation_unit.t) =
+  let attach_to_shape = function
+    | Type_shape.Ts_constr ((uid, path), ts) ->
+      Type_shape.Ts_constr
+        ((uid, attach_compilation_unit_to_path path compilation_unit), ts)
+    | _ as x -> x
+  in
+  { Type_decl_shape.path =
+      attach_compilation_unit_to_path type_decl.path compilation_unit;
+    type_params = List.map attach_to_shape type_decl.type_params;
+    definition =
+      (match type_decl.definition with
+      | Tds_variant { simple_constructors; complex_constructors } ->
+        Tds_variant
+          { simple_constructors;
+            complex_constructors =
+              map_snd (map_snd attach_to_shape) complex_constructors
+          }
+      | Tds_record list -> Tds_record (map_snd attach_to_shape list)
+      | Tds_alias shape -> Tds_alias (attach_to_shape shape)
+      | Tds_other -> Tds_other)
+  }

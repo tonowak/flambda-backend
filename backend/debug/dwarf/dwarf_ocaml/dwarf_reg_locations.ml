@@ -27,10 +27,8 @@ let reg_location_description (reg : Reg.t) ~(offset : Stack_reg_offset.t option)
     match reg.loc with
     | Unknown ->
       None
-        (*
-           CR tnowak for mshinwell: this was throwing when compiling the compiler
-      Misc.fatal_errorf "Register without location: %a" Printmach.reg reg
-        *)
+      (* CR tnowak for mshinwell: this was throwing when compiling the compiler
+         Misc.fatal_errorf "Register without location: %a" Printmach.reg reg *)
     | Reg n -> (
       let dwarf_reg_number =
         let reg_class = Proc.register_class reg in
