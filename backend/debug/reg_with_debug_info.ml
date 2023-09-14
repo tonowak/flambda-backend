@@ -83,6 +83,8 @@ let create ~reg ~holds_value_of ~part_of_value ~num_parts_of_value
   assert (num_parts_of_value >= 1);
   assert (part_of_value >= 0 && part_of_value < num_parts_of_value);
   assert (match which_parameter with None -> true | Some index -> index >= 0);
+  Format.eprintf "holds_value_of = %a, whcih_parameter = %a\n"
+    V.print holds_value_of (Format.pp_print_option Format.pp_print_int) which_parameter;
   let debug_info : Debug_info.t =
     { holds_value_of;
       part_of_value;

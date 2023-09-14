@@ -211,7 +211,8 @@ module Type_decl_shape = struct
                    Ident.name lbl.ld_id, Type_shape.Ts_predef (Unboxed_float, []))
                  lbl_list)
           | Record_inlined _ | Record_unboxed -> Tds_other)
-        | Type_abstract | Type_open -> Tds_other)
+        | Type_abstract -> Format.eprintf "got Type_abstract path=%a\n" Path.print path; Tds_other
+        | Type_open -> Tds_other)
     in
     let type_params =
       List.map
@@ -255,7 +256,7 @@ module Type_decl_shape = struct
     | Tds_other -> Format.fprintf ppf "Tds_other"
 
   let print ppf t =
-    Format.fprintf ppf "path=%a, definition=(%a)" Path.print t.path print_tds
+    Format.fprintf ppf "path=%a, comp_unit=%a, definition=(%a)" Path.print t.path (Format.pp_print_option Compilation_unit.print) t.compilation_unit print_tds
       t.definition
 
   let map_snd f list = List.map (fun (fst, snd) -> fst, f snd) list

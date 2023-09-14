@@ -174,8 +174,11 @@ let rec available_regs (instr : M.instruction) ~all_regs_that_might_be_named
            to be available. *)
         for part_of_value = 0 to num_parts_of_value - 1 do
           let reg = regs.(part_of_value) in
+          (*
+             CR tnowak for mshinwell: that's the if that made local variables not appear
           if RD.Set.mem_reg forgetting_ident reg
           then
+          *)
             let regd =
               RD.create ~reg ~holds_value_of:ident ~part_of_value
                 ~num_parts_of_value ~which_parameter ~provenance
