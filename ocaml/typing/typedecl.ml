@@ -356,7 +356,7 @@ module Shape_reduce = Shape.Make_reduce(struct
     let find_shape _env _ident = (*Ident.Tbl.find env ident*) Shape.dummy_mod
   end)
 
-let debug = true
+let debug = false
 
 let uid_of_path ~env path =
   if debug then Format.eprintf "uid_of_path path=%a\n" Path.print path;
@@ -387,9 +387,7 @@ let uid_of_path ~env path =
               assert (Ident.name ident = compilation_unit); shape)
             ~namespace:Type path
         in
-        Format.eprintf "shape before reduce = %a\n" Shape.print shape;
         let shape = Shape_reduce.reduce () shape in
-        Format.eprintf "shape after reduce = %a\n" Shape.print shape;
         match shape.uid with
         | None -> if debug then Format.eprintf "None3\n"; None
         | Some uid -> if debug then Format.eprintf "got it uid=%a\n" Uid.print uid; Some uid

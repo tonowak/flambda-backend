@@ -178,7 +178,6 @@ module Type_decl_shape = struct
     let definition =
       match type_declaration.type_manifest with
       | Some type_expr ->
-        Format.eprintf "constructing an alias %a\n" Path.print path;
         Tds_alias (Type_shape.of_type_expr type_expr uid_of_path)
       | None -> (
         match type_declaration.type_kind with
