@@ -5,6 +5,8 @@ module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module SLDL = Simple_location_description_lang
 
+let cache = Type_shape.Type_shape.Tbl.create 42
+
 let load_decls_from_cms path =
   let cms_infos = Cms_format.read path in
   cms_infos.cms_shapes_for_dwarf
@@ -324,8 +326,7 @@ let create_tuple_die ~reference ~parent_proto_die ~name ~fields =
     ~parent_proto_die
 
 let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
-    ~parent_proto_die ~fallback_die
-    ~(cache : Proto_die.reference Type_shape.Type_shape.Tbl.t) =
+    ~parent_proto_die ~fallback_die =
   match Type_shape.Type_shape.Tbl.find_opt cache type_shape with
   | Some reference -> reference
   | None ->
@@ -338,7 +339,6 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
       | Ts_predef (Array, [element_type_shape]) ->
         let child_die =
           type_shape_to_die element_type_shape ~parent_proto_die ~fallback_die
-            ~cache
         in
         create_array_die ~reference ~parent_proto_die ~child_die ~name;
         true
@@ -367,16 +367,13 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
           | Tds_alias alias_shape ->
             let alias_die =
               type_shape_to_die alias_shape ~parent_proto_die ~fallback_die
-                ~cache
             in
             create_typedef_die ~reference ~parent_proto_die ~child_die:alias_die
               ~name;
             true
           | Tds_record fields ->
             let fields =
-              map_snd
-                (type_shape_to_die ~parent_proto_die ~fallback_die ~cache)
-                fields
+              map_snd (type_shape_to_die ~parent_proto_die ~fallback_die) fields
             in
             create_record_die ~reference ~parent_proto_die ~name ~fields;
             true
@@ -389,8 +386,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
             | _ :: _ ->
               let complex_constructors =
                 map_snd
-                  (map_snd
-                     (type_shape_to_die ~parent_proto_die ~fallback_die ~cache))
+                  (map_snd (type_shape_to_die ~parent_proto_die ~fallback_die))
                   complex_constructors
               in
               create_complex_variant_die ~reference ~parent_proto_die ~name
@@ -398,9 +394,7 @@ let rec type_shape_to_die (type_shape : Type_shape.Type_shape.t)
               true)))
       | Ts_tuple fields ->
         let fields =
-          List.map
-            (type_shape_to_die ~parent_proto_die ~fallback_die ~cache)
-            fields
+          List.map (type_shape_to_die ~parent_proto_die ~fallback_die) fields
         in
         create_tuple_die ~reference ~parent_proto_die ~name ~fields;
         true
@@ -414,6 +408,4 @@ let variable_to_die state var_uid ~parent_proto_die =
   match Uid.Tbl.find_opt Type_shape.all_type_shapes var_uid with
   | None -> fallback_die
   | Some type_shape ->
-    (* CR tnowak: make cache global instead of local for each variable *)
-    let cache = Type_shape.Type_shape.Tbl.create 42 in
-    type_shape_to_die type_shape ~parent_proto_die ~fallback_die ~cache
+    type_shape_to_die type_shape ~parent_proto_die ~fallback_die

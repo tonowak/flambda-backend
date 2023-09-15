@@ -345,7 +345,7 @@ module Shape_reduce = Shape.Make_reduce(struct
 
     let read_unit_shape ~unit_name =
       let filename = String.uncapitalize_ascii unit_name in
-      match Load_path.find_uncap (filename ^ ".cmt") with
+      match Load_path.find_uncap (filename ^ ".cms") with
       | exception Not_found -> None
       | fn ->
         (* CR tnowak: exception? *)
@@ -372,7 +372,7 @@ let uid_of_path ~env path =
     )
   | Some compilation_unit ->
     let filename = String.uncapitalize_ascii compilation_unit in
-    match Load_path.find_uncap (filename ^ ".cmt") with
+    match Load_path.find_uncap (filename ^ ".cms") with
     | exception Not_found -> if debug then Format.eprintf "None1\n"; None
     | fn ->
       (* CR tnowak: exception? *)

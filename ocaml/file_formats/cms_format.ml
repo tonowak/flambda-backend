@@ -57,6 +57,7 @@ let read filename =
     )
 
 let save_cms filename modname sourcefile shape =
+  let cms_shapes_for_dwarf = Shape.Uid.Tbl.map Type_shape.all_type_decls (Type_shape.attach_compilation_unit_to_paths ~compilation_unit:(Compilation_unit.get_current_exn ())) in
   if (!Clflags.binary_annotations_cms && not !Clflags.print_types) then begin
     Misc.output_to_file_via_temporary
        ~mode:[Open_binary] filename
@@ -71,7 +72,7 @@ let save_cms filename modname sourcefile shape =
            cms_uid_to_loc = Env.get_uid_to_loc_tbl ();
            cms_uid_to_attributes = Env.get_uid_to_attributes_tbl ();
            cms_impl_shape = shape;
-           cms_shapes_for_dwarf = Shape.Uid.Tbl.map Type_shape.all_type_decls (Type_shape.attach_compilation_unit_to_paths ~compilation_unit:(Compilation_unit.get_current_exn ()));
+           cms_shapes_for_dwarf;
          } in
          output_cms oc cms)
   end

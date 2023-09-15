@@ -351,7 +351,7 @@ let find_in_type_decls (type_uid : Uid.t) (type_path : Path.t)
           compilation_unit;
       (* CR tnowak: change the [String.lowercase_ascii] to a proper function. *)
       let filename = compilation_unit |> String.uncapitalize_ascii in
-      match Load_path.find_uncap (filename ^ ".cmt") with
+      match Load_path.find_uncap (filename ^ ".cms") with
       | exception Not_found ->
         if debug
         then

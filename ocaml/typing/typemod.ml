@@ -3271,12 +3271,12 @@ let type_implementation sourcefile outputprefix modulename initial_env ast =
           Profile.record_call "save_cmt" (fun () ->
             let shape = Shape.local_reduce shape in
             let annots = Cmt_format.Implementation str in
-            (*
             Cmt_format.save_cmt (outputprefix ^ ".cmt") modulename
               annots (Some sourcefile) initial_env None (Some shape);
-            *)
-            Cms_format.save_cms (outputprefix ^ ".cmt") modulename
-              (Some sourcefile) (Some shape);
+            (match !Clflags.native_code with
+            | true -> ()
+            | false -> Cms_format.save_cms (outputprefix ^ ".cms") modulename
+              (Some sourcefile) (Some shape));
             gen_annot outputprefix sourcefile annots);
           { structure = str;
             coercion;
@@ -3302,19 +3302,19 @@ let type_implementation sourcefile outputprefix modulename initial_env ast =
           let shape = Shape.local_reduce shape in
           if not !Clflags.dont_write_files then begin
             let alerts = Builtin_attributes.alerts_of_str ast in
-            let _cmi =
+            let cmi =
               Profile.record_call "save_cmi" (fun () ->
                 Env.save_signature ~alerts
                   simple_sg modulename (outputprefix ^ ".cmi"))
             in
             Profile.record_call "save_cmt" (fun () ->
               let annots = Cmt_format.Implementation str in
-              (*
               Cmt_format.save_cmt  (outputprefix ^ ".cmt") modulename
                 annots (Some sourcefile) initial_env (Some cmi) (Some shape);
-              *)
-              Cms_format.save_cms  (outputprefix ^ ".cmt") modulename
-                (Some sourcefile) (Some shape);
+              (match !Clflags.native_code with
+               | true -> ()
+               | false -> Cms_format.save_cms  (outputprefix ^ ".cms") modulename
+                (Some sourcefile) (Some shape));
               gen_annot outputprefix sourcefile annots)
           end;
           { structure = str;
@@ -3331,20 +3331,24 @@ let type_implementation sourcefile outputprefix modulename initial_env ast =
             Cmt_format.Partial_implementation
               (Array.of_list (Cmt_format.get_saved_types ()))
           in
-          (*
           Cmt_format.save_cmt  (outputprefix ^ ".cmt") modulename
             annots (Some sourcefile) initial_env None None;
-          *)
-          Cms_format.save_cms  (outputprefix ^ ".cmt") modulename
-            (Some sourcefile) None;
+          (match !Clflags.native_code with
+           | true -> ()
+           | false ->
+            Cms_format.save_cms  (outputprefix ^ ".cms") modulename
+              (Some sourcefile) None);
           gen_annot outputprefix sourcefile annots)
       )
 
 let save_signature modname tsg outputprefix source_file initial_env cmi =
   Cmt_format.save_cmt  (outputprefix ^ ".cmti") modname
     (Cmt_format.Interface tsg) (Some source_file) initial_env (Some cmi) None;
-  Cms_format.save_cms  (outputprefix ^ ".cmsi") modname
-    (Some source_file) None
+  (match !Clflags.native_code with
+   | true -> ()
+   | false ->
+     Cms_format.save_cms  (outputprefix ^ ".cmsi") modname
+       (Some source_file) None)
 
 let type_interface env ast =
   transl_signature env ast
@@ -3432,12 +3436,13 @@ let package_units initial_env objfiles cmifile modulename =
       Includemod.compunit initial_env ~mark:Mark_both
         "(obtained by packing)" sg mlifile dclsig shape
     in
-    (*
     Cmt_format.save_cmt  (prefix ^ ".cmt") modulename
       (Cmt_format.Packed (sg, objfiles)) None initial_env  None (Some shape);
-    *)
-    Cms_format.save_cms  (prefix ^ ".cmt") modulename
-      None (Some shape);
+    (match !Clflags.native_code with
+     | true -> ()
+     | false ->
+      Cms_format.save_cms  (prefix ^ ".cms") modulename
+        None (Some shape));
     cc
   end else begin
     (* Determine imports *)
@@ -3454,13 +3459,15 @@ let package_units initial_env objfiles cmifile modulename =
           sg modulename
           (prefix ^ ".cmi") (Array.of_list imports)
       in
-      let _sign = Subst.Lazy.force_signature cmi.Cmi_format.cmi_sign in
-      (*
+      let sign = Subst.Lazy.force_signature cmi.Cmi_format.cmi_sign in
       Cmt_format.save_cmt (prefix ^ ".cmt")  modulename
         (Cmt_format.Packed (sign, objfiles)) None initial_env
-         (Some cmi) (Some shape); *)
-      Cms_format.save_cms (prefix ^ ".cmt")  modulename
-        None (Some shape);
+         (Some cmi) (Some shape);
+      (match !Clflags.native_code with
+       | true -> ()
+       | false ->
+        Cms_format.save_cms (prefix ^ ".cms")  modulename
+          None (Some shape));
     end;
     Tcoerce_none
   end
